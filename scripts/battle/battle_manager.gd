@@ -25,6 +25,7 @@ var player_hp: int
 var player_max_hp: int
 var energy: int = 1          # "殺" limit per turn
 var energy_used: int = 0
+var wine_active: bool = false   # Next 殺 deals +1 damage
 var hand_size_limit: int     # = player_hp normally
 var attack_limit_reached: bool = false  # for 呂布 無雙
 
@@ -186,6 +187,7 @@ func _resolve_end_phase() -> void:
     ## Trigger end-of-turn effects (e.g. 閉月 draws 1 card).
     # TODO: Apply hero-specific end-phase effects
     energy_used = 0
+    wine_active = false
     attack_limit_reached = false
     hand_size_limit = player_hp  # Reset (may be modified by 克己)
 
@@ -229,18 +231,26 @@ func play_card(card: CardData, target = null) -> bool:
                 CardData.SubType.SLASH:
                     if energy_used >= energy:
                         return false  # "殺" limit reached (unless 張飛 咆哮)
-                    # Deal damage to target
+                    # Deal damage to target (with wine bonus)
+                    var dmg := card.damage
+                    if wine_active:
+                        dmg += 1
+                        wine_active = false
                     if target and target is EnemyData:
-                        target.take_damage(card.damage)
-                        print("Dealt %d damage to %s (HP: %d/%d)" % [card.damage, target.name_zh, target.current_hp, target.max_hp])
+                        target.take_damage(dmg)
+                        print("Dealt %d damage to %s (HP: %d/%d)" % [dmg, target.name_zh, target.current_hp, target.max_hp])
                     energy_used += 1
                 CardData.SubType.DODGE:
                     pass  # Played in response, not proactively
                 CardData.SubType.PEACH:
                     player_hp = min(player_hp + card.heal, player_max_hp)
                 CardData.SubType.WINE:
-                    # Next 殺 this turn deals +1 damage; or self-rescue at 0 HP
-                    pass
+                    if player_hp <= 0:
+                        # Self-rescue when dying
+                        player_hp = 1
+                    else:
+                        # Boost next 殺
+                        wine_active = true
         CardData.CardType.STRATEGY:
             _resolve_strategy(card, target)
         CardData.CardType.EQUIPMENT:

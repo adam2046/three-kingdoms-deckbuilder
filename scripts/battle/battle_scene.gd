@@ -155,6 +155,8 @@ func _create_card_node(card: CardData):
 func _refresh_stats() -> void:
     hp_label.text = "HP: %d/%d" % [battle_manager.player_hp, battle_manager.player_max_hp]
     energy_label.text = "殺: %d/%d" % [battle_manager.energy_used, battle_manager.energy]
+    if battle_manager.wine_active:
+        energy_label.text += "  🍶"
     deck_label.text = "牌庫: %d" % battle_manager.deck.size()
     discard_label.text = "棄牌: %d" % battle_manager.discard_pile.size()
 
