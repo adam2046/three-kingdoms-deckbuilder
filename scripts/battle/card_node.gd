@@ -2,16 +2,15 @@ extends Panel
 class_name CardNode
 
 ## CardNode — visual representation of a CardData in the hand.
-## Creates its own child nodes programmatically (no .tscn needed).
 
 signal card_clicked(card: CardData)
 
 var card_data: CardData
 
-# Child references (created in _ready)
 var suit_label: Label
 var name_label: Label
 var type_label: Label
+var _children_created := false
 
 const CARD_WIDTH := 120
 const CARD_HEIGHT := 180
@@ -33,40 +32,45 @@ const RARITY_BORDERS := {
 
 func _ready() -> void:
     custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
+    _ensure_children()
+    gui_input.connect(_on_gui_input)
+    if card_data != null:
+        _refresh_display()
+
+
+func _ensure_children() -> void:
+    if _children_created:
+        return
+    _children_created = true
     
-    # Create child nodes
     var vbox := VBoxContainer.new()
     vbox.add_theme_constant_override("separation", 4)
     add_child(vbox)
     
-    # Suit + number
     suit_label = Label.new()
     suit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     suit_label.add_theme_font_size_override("font_size", 20)
     vbox.add_child(suit_label)
     
-    # Card name
     name_label = Label.new()
     name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     name_label.add_theme_font_size_override("font_size", 18)
     vbox.add_child(name_label)
     
-    # Type tag
     type_label = Label.new()
     type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     type_label.add_theme_font_size_override("font_size", 12)
     vbox.add_child(type_label)
-    
-    gui_input.connect(_on_gui_input)
 
 
 func setup(card: CardData) -> void:
     card_data = card
+    _ensure_children()  # Safe to call before _ready
     _refresh_display()
 
 
 func _refresh_display() -> void:
-    if card_data == null:
+    if card_data == null or suit_label == null:
         return
     
     suit_label.text = "%s %s" % [card_data.suit_symbol(), card_data.number_display]
