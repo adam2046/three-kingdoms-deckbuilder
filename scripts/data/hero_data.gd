@@ -42,7 +42,7 @@ enum Archetype { ATTACK, BALANCED, SUPPORT }
 @export_multiline var skill_2_fallback_en: String
 
 # -- Starting Deck --
-@export var starting_deck: Array[String] = []  # Card IDs for starting deck
+@export var starting_deck: Array = []  # CardData objects or string IDs
 
 # -- Unlock --
 @export var is_starter: bool = false     # Unlocked from the beginning

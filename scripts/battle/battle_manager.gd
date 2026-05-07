@@ -42,7 +42,7 @@ var enemies: Array = []       # Array of EnemyData/Node references
 
 
 func _ready() -> void:
-    initialize_battle()
+    pass  # Battle is initialized externally after hero is loaded
 
 
 func initialize_battle() -> void:
@@ -199,7 +199,7 @@ func draw_cards(count: int) -> void:
         if deck.is_empty():
             _reshuffle_discard()
         if not deck.is_empty():
-            var card := deck.pop_back()
+            var card: CardData = deck.pop_back()
             hand.append(card)
 
 
@@ -209,7 +209,7 @@ func draw_top_card() -> CardData:
         _reshuffle_discard()
     if deck.is_empty():
         return null
-    var card := deck.pop_back()
+    var card: CardData = deck.pop_back()
     return card
 
 

@@ -140,13 +140,13 @@ func _refresh_hand() -> void:
         child.queue_free()
     
     for card in battle_manager.hand:
-        var card_node := _create_card_node(card)
+        var card_node = _create_card_node(card)
         hand_container.add_child(card_node)
 
 
-func _create_card_node(card: CardData) -> CardNode:
-    ## Create a CardNode instance programmatically (no .tscn needed).
-    var node := CardNode.new()
+func _create_card_node(card: CardData):
+    ## Create a CardNode instance. Returns untyped to avoid parse errors in headless.
+    var node = CardNode.new()
     node.setup(card)
     node.card_clicked.connect(_on_card_played)
     return node
@@ -305,7 +305,7 @@ func _on_end_turn_pressed() -> void:
 func _auto_discard() -> void:
     ## Discard excess cards (hand > HP). Simple: discard from right.
     while battle_manager.hand.size() > battle_manager.player_hp:
-        var card := battle_manager.hand.back()
+        var card: CardData = battle_manager.hand.back()
         battle_manager.discard_card(card)
 
 
