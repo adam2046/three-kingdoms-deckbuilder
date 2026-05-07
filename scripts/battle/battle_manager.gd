@@ -75,8 +75,62 @@ func start_turn() -> void:
 func end_turn() -> void:
     _advance_phase(Phase.END)
     await _resolve_end_phase()
+    
+    # Enemy turns happen between player turns
+    await _execute_enemy_turns()
+    
+    # Check if any enemies remain
+    if enemies.is_empty() or _all_enemies_dead():
+        battle_ended.emit(true)
+        return
+    
     turn_number += 1
     start_turn()
+
+
+func _execute_enemy_turns() -> void:
+    ## Each enemy takes its action.
+    for enemy in enemies:
+        if not enemy.is_alive():
+            continue
+        
+        match enemy.current_intent:
+            EnemyData.Intent.ATTACK:
+                _enemy_attack(enemy)
+            EnemyData.Intent.DEFEND:
+                enemy.heal(enemy.intent_value)
+            EnemyData.Intent.BUFF:
+                enemy.intent_value += 1
+            EnemyData.Intent.SKILL:
+                _enemy_skill(enemy)
+        
+        # Set next intent
+        enemy.current_intent = enemy.next_intent(turn_number + 1)
+        enemy.intent_value = 1 if enemy.current_intent != EnemyData.Intent.SKILL else 2
+    
+    # Remove dead enemies
+    enemies = enemies.filter(func(e): return e.is_alive())
+
+
+func _enemy_attack(enemy: EnemyData) -> void:
+    var blocked := false
+    if follower and follower.is_alive() and follower.can_block:
+        follower.take_damage(enemy.intent_value)
+        blocked = true
+    
+    if not blocked:
+        take_damage(enemy.intent_value)
+
+
+func _enemy_skill(enemy: EnemyData) -> void:
+    take_damage(enemy.intent_value + 1)
+
+
+func _all_enemies_dead() -> bool:
+    for e in enemies:
+        if e.is_alive():
+            return false
+    return true
 
 
 # ============================================================

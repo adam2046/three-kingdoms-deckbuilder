@@ -240,30 +240,6 @@ func _on_phase_changed(phase: BattleManager.Phase) -> void:
 var selected_card: CardData = null  # Card currently selected for targeting
 
 
-func _on_card_played(card: CardData) -> void:
-    ## Player clicks a card in hand. If it needs a target, select it and wait for enemy click.
-    ## If no target needed (peach, draw2, etc.), play immediately.
-    if battle_manager.current_phase != BattleManager.Phase.PLAY:
-        return
-    
-    # Check if card needs a target
-    var needs_target := _card_needs_target(card)
-    
-    if needs_target:
-        # Select card, wait for enemy click
-        selected_card = card
-        for child in hand_container.get_children():
-            if child is CardNode and child.card_data == card:
-                child.highlight(true)
-        print("Select target for: %s" % card.name_zh)
-    else:
-        # Play immediately
-        var success := battle_manager.play_card(card)
-        if success:
-            _refresh_ui()
-            _advance_enemy_turn_if_all_dead()
-
-
 func _card_needs_target(card: CardData) -> bool:
     match card.card_type:
         CardData.CardType.BASIC:
@@ -274,87 +250,52 @@ func _card_needs_target(card: CardData) -> bool:
             return false
 
 
+func _on_card_played(card: CardData) -> void:
+    ## Player clicks a card. If needs target, select and wait for enemy click.
+    ## If no target (peach, draw2), play immediately.
+    if battle_manager.current_phase != BattleManager.Phase.PLAY:
+        return
+    
+    var needs_target := _card_needs_target(card)
+    
+    if needs_target:
+        selected_card = card
+        for child in hand_container.get_children():
+            if child is CardNode and child.card_data == card:
+                child.highlight(true)
+    else:
+        if battle_manager.play_card(card):
+            _refresh_ui()
+
+
 func _on_enemy_clicked(event: InputEvent, enemy: EnemyData) -> void:
     if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
         return
     if selected_card == null:
         return
     
-    var success := battle_manager.play_card(selected_card, enemy)
-    if success:
-        print("Played %s on %s" % [selected_card.name_zh, enemy.name_zh])
+    battle_manager.play_card(selected_card, enemy)
     
-    # Clear selection
     selected_card = null
     for child in hand_container.get_children():
         if child is CardNode:
             child.highlight(false)
     
     _refresh_ui()
-    _advance_enemy_turn_if_all_dead()
-
-
-func _advance_enemy_turn_if_all_dead() -> void:
-    ## Check if all enemies are dead, and handle enemy turns.
-    var all_dead := true
-    for enemy in battle_manager.enemies:
-        if enemy.is_alive():
-            all_dead = false
-            break
-    
-    if all_dead:
-        # Victory! Move to rewards
-        battle_manager.battle_ended.emit(true)
-    elif selected_card == null:
-        # Enemy turn: each enemy acts
-        await _execute_enemy_turns()
-        battle_manager.end_turn()
-        _refresh_ui()
-
-
-func _execute_enemy_turns() -> void:
-    for enemy in battle_manager.enemies:
-        if not enemy.is_alive():
-            continue
-        
-        match enemy.current_intent:
-            EnemyData.Intent.ATTACK:
-                # Enemy attacks player (or follower if 護衛)
-                var target_hp := battle_manager.player_hp
-                var blocked := false
-                if battle_manager.follower and battle_manager.follower.is_alive() and battle_manager.follower.can_block:
-                    battle_manager.follower.take_damage(enemy.intent_value)
-                    blocked = true
-                
-                if not blocked:
-                    battle_manager.take_damage(enemy.intent_value)
-                print("%s attacks for %d damage" % [enemy.name_zh, enemy.intent_value])
-            
-            EnemyData.Intent.DEFEND:
-                enemy.heal(enemy.intent_value)  # Gain block
-                print("%s defends for %d" % [enemy.name_zh, enemy.intent_value])
-            
-            EnemyData.Intent.BUFF:
-                enemy.intent_value += 1  # Power up
-                print("%s powers up!" % enemy.name_zh)
-            
-            EnemyData.Intent.SKILL:
-                # Skill-specific behavior — placeholder
-                battle_manager.take_damage(enemy.intent_value + 1)
-                print("%s uses skill for %d damage" % [enemy.name_zh, enemy.intent_value + 1])
-        
-        # Set next turn's intent
-        enemy.current_intent = enemy.next_intent(battle_manager.turn_number + 1)
-        enemy.intent_value = 1 if enemy.current_intent != EnemyData.Intent.SKILL else 2
 
 
 func _on_end_turn_pressed() -> void:
-    ## Player clicks "End Turn" — move to discard phase.
-    if battle_manager.current_phase == BattleManager.Phase.PLAY:
-        battle_manager._advance_phase(BattleManager.Phase.DISCARD)
-        # For now, auto-resolve discard and end
-        _auto_discard()
-        battle_manager.end_turn()
+    ## Player clicks "End Turn" — move to discard phase, then enemies act.
+    if battle_manager.current_phase != BattleManager.Phase.PLAY:
+        return
+    
+    # Auto-discard excess cards
+    battle_manager._advance_phase(BattleManager.Phase.DISCARD)
+    _auto_discard()
+    
+    # End turn — this triggers enemy turns + next player turn
+    battle_manager.end_turn()
+    _refresh_ui()
 
 
 func _auto_discard() -> void:
