@@ -1,0 +1,22 @@
+# Godot 4+ specific ignores
+.godot/imported/
+.godot/editor/*.cfg
+.godot/editor/editor_layout.cfg
+.godot/editor/editor_script_doc_cache.res
+.godot/editor/filesystem_cache*
+.godot/editor/project_metadata.cfg
+.godot/editor/script_editor_cache.cfg
+.godot/global_script_class_cache.cfg
+.godot/scene_groups_cache.cfg
+.godot/uid_cache.bin
+
+# Godot-specific ignores
+*.import
+*.translation
+export_presets.cfg
+
+# Imported files
+.import/
+
+# macOS
+.DS_Store
