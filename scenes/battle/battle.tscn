@@ -38,6 +38,21 @@ text = "殺: 0/1"
 layout_mode = 2
 text = "判定"
 
+[node name="DeckInfo" type="VBoxContainer" parent="UI"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 70.0
+offset_right = 150.0
+offset_bottom = 120.0
+
+[node name="DeckLabel" type="Label" parent="UI/DeckInfo"]
+layout_mode = 2
+text = "牌庫: 0"
+
+[node name="DiscardLabel" type="Label" parent="UI/DeckInfo"]
+layout_mode = 2
+text = "棄牌: 0"
+
 [node name="HandContainer" type="HBoxContainer" parent="UI"]
 layout_mode = 0
 offset_left = 100.0

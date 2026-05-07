@@ -9,6 +9,8 @@ class_name BattleScene
 @onready var energy_label: Label = $UI/TopBar/EnergyLabel
 @onready var hp_label: Label = $UI/TopBar/HPLabel
 @onready var phase_label: Label = $UI/TopBar/PhaseLabel
+@onready var deck_label: Label = $UI/DeckInfo/DeckLabel
+@onready var discard_label: Label = $UI/DeckInfo/DiscardLabel
 @onready var end_turn_btn: Button = $UI/EndTurnBtn
 @onready var enemy_container: HBoxContainer = $EnemyArea/EnemyContainer
 @onready var judgment_display: Control = $UI/JudgmentZone
@@ -153,6 +155,8 @@ func _create_card_node(card: CardData) -> CardNode:
 func _refresh_stats() -> void:
     hp_label.text = "HP: %d/%d" % [battle_manager.player_hp, battle_manager.player_max_hp]
     energy_label.text = "殺: %d/%d" % [battle_manager.energy_used, battle_manager.energy]
+    deck_label.text = "牌庫: %d" % battle_manager.deck.size()
+    discard_label.text = "棄牌: %d" % battle_manager.discard_pile.size()
 
 
 func _refresh_enemies() -> void:
