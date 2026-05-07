@@ -26,6 +26,10 @@ offset_top = 16.0
 offset_right = 1900.0
 offset_bottom = 56.0
 
+[node name="HeroLabel" type="Label" parent="UI/TopBar"]
+layout_mode = 2
+text = "趙雲"
+
 [node name="HPLabel" type="Label" parent="UI/TopBar"]
 layout_mode = 2
 text = "HP: 4/4"
@@ -83,6 +87,14 @@ offset_top = 900.0
 offset_right = 1900.0
 offset_bottom = 960.0
 text = "結束回合"
+
+[node name="SkillBtn" type="Button" parent="UI"]
+layout_mode = 0
+offset_left = 1500.0
+offset_top = 900.0
+offset_right = 1680.0
+offset_bottom = 960.0
+text = "技能"
 
 [node name="EnemyArea" type="Control" parent="."]
 layout_mode = 0

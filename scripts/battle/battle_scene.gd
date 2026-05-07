@@ -8,10 +8,12 @@ class_name BattleScene
 @onready var hand_container: HBoxContainer = $UI/HandContainer
 @onready var energy_label: Label = $UI/TopBar/EnergyLabel
 @onready var hp_label: Label = $UI/TopBar/HPLabel
+@onready var hero_label: Label = $UI/TopBar/HeroLabel
 @onready var phase_label: Label = $UI/TopBar/PhaseLabel
 @onready var deck_label: Label = $UI/DeckInfo/DeckLabel
 @onready var discard_label: Label = $UI/DeckInfo/DiscardLabel
 @onready var end_turn_btn: Button = $UI/EndTurnBtn
+@onready var skill_btn: Button = $UI/SkillBtn
 @onready var enemy_container: HBoxContainer = $EnemyArea/EnemyContainer
 @onready var judgment_display: Control = $UI/JudgmentZone
 @onready var follower_display: Control = $UI/FollowerDisplay
@@ -23,28 +25,44 @@ func _ready() -> void:
     battle_manager.phase_changed.connect(_on_phase_changed)
     battle_manager.battle_ended.connect(_on_battle_ended)
     end_turn_btn.pressed.connect(_on_end_turn_pressed)
+    skill_btn.pressed.connect(_on_skill_pressed)
+    skill_btn.visible = false
     
-    # Load test hero for prototyping
-    _load_test_hero()
+    # Load test hero for prototyping — change ID to test different heroes
+    _load_test_hero("zhao_yun")  # Options: zhao_yun, cao_cao, sun_quan
     battle_manager.initialize_battle()
     _refresh_ui()
 
 
-func _load_test_hero() -> void:
-    ## Load a test hero for prototyping. Start with 趙雲 (balanced, easy).
+func _load_test_hero(hero_id: String = "zhao_yun") -> void:
     var hero := HeroData.new()
-    hero.id = "zhao_yun"
-    hero.name_zh = "趙雲"
-    hero.name_en = "Zhao Yun"
-    hero.title_zh = "一身是膽"
-    hero.faction = HeroData.Faction.SHU
-    hero.archetype = HeroData.Archetype.BALANCED
-    hero.max_hp = 4
-    hero.skill_1_name_zh = "龍膽"
-    hero.skill_1_desc_zh = "你可以將「殺」當作「閃」使用或打出；你可以將「閃」當作「殺」使用或打出。"
+    hero.id = hero_id
     
-    # Starting deck: 4 殺, 3 閃, 1 桃, 1 酒, 1 過河拆橋 (BALANCED archetype)
-    hero.starting_deck = _create_starter_deck_balanced()
+    match hero_id:
+        "zhao_yun":
+            hero.name_zh = "趙雲"
+            hero.max_hp = 4
+            hero.faction = HeroData.Faction.SHU
+            hero.archetype = HeroData.Archetype.BALANCED
+            hero.skill_1_name_zh = "龍膽"
+            hero.skill_1_desc_zh = "殺可當閃，閃可當殺"
+            hero.starting_deck = _create_starter_deck_balanced()
+        "cao_cao":
+            hero.name_zh = "曹操"
+            hero.max_hp = 4
+            hero.faction = HeroData.Faction.WEI
+            hero.archetype = HeroData.Archetype.BALANCED
+            hero.skill_1_name_zh = "奸雄"
+            hero.skill_1_desc_zh = "受傷後摸1張牌"
+            hero.starting_deck = _create_starter_deck_balanced()
+        "sun_quan":
+            hero.name_zh = "孫權"
+            hero.max_hp = 4
+            hero.faction = HeroData.Faction.WU
+            hero.archetype = HeroData.Archetype.BALANCED
+            hero.skill_1_name_zh = "制衡"
+            hero.skill_1_desc_zh = "棄全部手牌，摸等量牌（每回1次）"
+            hero.starting_deck = _create_starter_deck_balanced()
     
     battle_manager.player_hero = hero
 
@@ -132,6 +150,7 @@ func _refresh_ui() -> void:
     _refresh_stats()
     _refresh_enemies()
     _refresh_follower()
+    _refresh_skill_button()
 
 
 func _refresh_hand() -> void:
@@ -153,6 +172,7 @@ func _create_card_node(card: CardData):
 
 
 func _refresh_stats() -> void:
+    hero_label.text = battle_manager.player_hero.name_zh
     hp_label.text = "HP: %d/%d" % [battle_manager.player_hp, battle_manager.player_max_hp]
     energy_label.text = "殺: %d/%d" % [battle_manager.energy_used, battle_manager.energy]
     if battle_manager.wine_active:
@@ -316,3 +336,21 @@ func _on_battle_ended(victory: bool) -> void:
         print("VICTORY!")
     else:
         print("DEFEAT...")
+
+
+func _refresh_skill_button() -> void:
+    if battle_manager.current_phase == BattleManager.Phase.PLAY:
+        skill_btn.visible = battle_manager._has_active_skill()
+        if skill_btn.visible:
+            match battle_manager.player_hero.id:
+                "sun_quan":
+                    skill_btn.text = "制衡"
+    else:
+        skill_btn.visible = false
+
+
+func _on_skill_pressed() -> void:
+    match battle_manager.player_hero.id:
+        "sun_quan":
+            battle_manager._activate_skill("zhiheng")
+    _refresh_ui()

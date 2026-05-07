@@ -38,8 +38,97 @@ var judgment_zone: Array[CardData] = []  # Delayed strategies pending judgment
 var equipment_slots: Dictionary = {}     # weapon, armor, horse_plus, horse_minus
 var follower: Follower = null            # Max 1 ally
 
+# -- Skill state --
+var skill_used_this_turn: Dictionary = {}  # e.g. {"zhiheng": true}
+
 # -- Enemies --
 var enemies: Array = []       # Array of EnemyData/Node references
+
+
+# ============================================================
+#  HERO SKILL SYSTEM
+# ============================================================
+
+## Skill hooks — called at specific points in the battle flow.
+## Each checks player_hero.id and dispatches to the right implementation.
+
+func _on_damage_taken(amount: int, source = null) -> void:
+    ## Called after the player takes damage. Hero skills can react.
+    match player_hero.id:
+        "cao_cao":
+            _skill_jianxiong(source)
+
+
+func _can_substitute(card: CardData, as_sub_type: CardData.SubType) -> bool:
+    ## Check if a card can be played as a different sub-type.
+    ## Used by skills like 龍膽 (殺↔閃), 武聖 (red→殺), 傾國 (black→閃), etc.
+    match player_hero.id:
+        "zhao_yun":
+            return _skill_longdan_check(card, as_sub_type)
+    return false
+
+
+func _get_substitute_card(card: CardData, as_sub_type: CardData.SubType) -> CardData:
+    ## Return a copy of the card treated as the substitute type.
+    ## Doesn't modify the original — caller decides whether to use it.
+    var sub := card.duplicate()
+    sub.sub_type = as_sub_type
+    match as_sub_type:
+        CardData.SubType.SLASH:
+            sub.damage = 1
+            sub.name_zh = "殺"
+        CardData.SubType.DODGE:
+            sub.block = 1
+            sub.name_zh = "閃"
+    return sub
+
+
+func _has_active_skill() -> bool:
+    ## Returns true if the hero has a skill the player can activate now.
+    match player_hero.id:
+        "sun_quan":
+            return not skill_used_this_turn.get("zhiheng", false) and not hand.is_empty()
+    return false
+
+
+func _activate_skill(skill_name: String) -> bool:
+    ## Activate a hero's active skill. Returns true if successful.
+    match skill_name:
+        "zhiheng":
+            return _skill_zhiheng()
+    return false
+
+
+# --- Individual skill implementations ---
+
+func _skill_jianxiong(source = null) -> void:
+    ## 曹操 奸雄: when damaged, gain a copy of the attacker's last used card.
+    ## For now: draw 1 extra card as compensation.
+    draw_cards(1)
+
+
+func _skill_longdan_check(card: CardData, as_sub_type: CardData.SubType) -> bool:
+    ## 趙雲 龍膽: 殺 can be used as 閃, 閃 can be used as 殺.
+    if card.sub_type == CardData.SubType.SLASH and as_sub_type == CardData.SubType.DODGE:
+        return true
+    if card.sub_type == CardData.SubType.DODGE and as_sub_type == CardData.SubType.SLASH:
+        return true
+    return false
+
+
+func _skill_zhiheng() -> bool:
+    ## 孫權 制衡: discard any number of cards, draw that many. Once per turn.
+    if skill_used_this_turn.get("zhiheng", false):
+        return false
+    if hand.is_empty():
+        return false
+    # Discard all hand, draw equal amount
+    var count := hand.size()
+    for card in hand.duplicate():
+        discard_card(card)
+    draw_cards(count)
+    skill_used_this_turn["zhiheng"] = true
+    return true
 
 
 func _ready() -> void:
@@ -189,6 +278,7 @@ func _resolve_end_phase() -> void:
     energy_used = 0
     wine_active = false
     attack_limit_reached = false
+    skill_used_this_turn.clear()
     hand_size_limit = player_hp  # Reset (may be modified by 克己)
 
 
@@ -369,6 +459,7 @@ func discard_card(card: CardData) -> void:
 
 func take_damage(amount: int) -> void:
     player_hp = max(0, player_hp - amount)
+    _on_damage_taken(amount)  # Trigger hero skill reactions (e.g. 奸雄)
     if player_hp <= 0:
         # TODO: Check for 桃 rescue opportunity
         battle_ended.emit(false)
