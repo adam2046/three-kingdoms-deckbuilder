@@ -133,15 +133,21 @@ func _refresh_ui() -> void:
 
 
 func _refresh_hand() -> void:
-    ## Clear and rebuild hand display
+    ## Clear and rebuild hand display using CardNode components.
     for child in hand_container.get_children():
         child.queue_free()
     
     for card in battle_manager.hand:
-        var card_btn := Button.new()
-        card_btn.text = "%s%s %s" % [card.suit_symbol(), card.number_display, card.name_zh]
-        card_btn.pressed.connect(_on_card_played.bind(card))
-        hand_container.add_child(card_btn)
+        var card_node := _create_card_node(card)
+        hand_container.add_child(card_node)
+
+
+func _create_card_node(card: CardData) -> CardNode:
+    ## Create a CardNode instance programmatically (no .tscn needed).
+    var node := CardNode.new()
+    node.setup(card)
+    node.card_clicked.connect(_on_card_played)
+    return node
 
 
 func _refresh_stats() -> void:
@@ -150,8 +156,57 @@ func _refresh_stats() -> void:
 
 
 func _refresh_enemies() -> void:
-    # TODO: Populate enemy display from battle_manager.enemies
-    pass
+    for child in enemy_container.get_children():
+        child.queue_free()
+    
+    for enemy in battle_manager.enemies:
+        var enemy_node := _create_enemy_node(enemy)
+        enemy_container.add_child(enemy_node)
+
+
+func _create_enemy_node(enemy: EnemyData) -> Panel:
+    var panel := Panel.new()
+    panel.custom_minimum_size = Vector2(160, 200)
+    
+    var vbox := VBoxContainer.new()
+    panel.add_child(vbox)
+    
+    var name_label := Label.new()
+    name_label.text = enemy.name_zh
+    name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    vbox.add_child(name_label)
+    
+    var hp_label := Label.new()
+    hp_label.text = "HP: %d/%d" % [enemy.current_hp, enemy.max_hp]
+    hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    hp_label.name = "HPLabel"
+    vbox.add_child(hp_label)
+    
+    var intent_label := Label.new()
+    var intent_names := ["⚔️攻擊", "🛡防禦", "⬆️強化", "✨技能"]
+    intent_label.text = intent_names[enemy.current_intent]
+    intent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    intent_label.name = "IntentLabel"
+    vbox.add_child(intent_label)
+    
+    # Style
+    var style := StyleBoxFlat.new()
+    style.bg_color = Color(0.3, 0.1, 0.1, 0.8)
+    style.border_color = Color.RED
+    style.border_width_left = 2
+    style.border_width_right = 2
+    style.border_width_top = 2
+    style.border_width_bottom = 2
+    style.corner_radius_top_left = 10
+    style.corner_radius_top_right = 10
+    style.corner_radius_bottom_left = 10
+    style.corner_radius_bottom_right = 10
+    panel.add_theme_stylebox_override("panel", style)
+    
+    # Click to target
+    panel.gui_input.connect(_on_enemy_clicked.bind(enemy))
+    
+    return panel
 
 
 func _refresh_follower() -> void:
@@ -182,14 +237,115 @@ func _on_phase_changed(phase: BattleManager.Phase) -> void:
         end_turn_btn.visible = false
 
 
+var selected_card: CardData = null  # Card currently selected for targeting
+
+
 func _on_card_played(card: CardData) -> void:
-    ## Called when player clicks a card in hand. For now, plays with no target.
+    ## Player clicks a card in hand. If it needs a target, select it and wait for enemy click.
+    ## If no target needed (peach, draw2, etc.), play immediately.
     if battle_manager.current_phase != BattleManager.Phase.PLAY:
         return
     
-    var success := battle_manager.play_card(card)
+    # Check if card needs a target
+    var needs_target := _card_needs_target(card)
+    
+    if needs_target:
+        # Select card, wait for enemy click
+        selected_card = card
+        for child in hand_container.get_children():
+            if child is CardNode and child.card_data == card:
+                child.highlight(true)
+        print("Select target for: %s" % card.name_zh)
+    else:
+        # Play immediately
+        var success := battle_manager.play_card(card)
+        if success:
+            _refresh_ui()
+            _advance_enemy_turn_if_all_dead()
+
+
+func _card_needs_target(card: CardData) -> bool:
+    match card.card_type:
+        CardData.CardType.BASIC:
+            return card.sub_type == CardData.SubType.SLASH
+        CardData.CardType.STRATEGY:
+            return card.sub_type in [CardData.SubType.DISMANTLE, CardData.SubType.STEAL, CardData.SubType.DUEL]
+        _:
+            return false
+
+
+func _on_enemy_clicked(event: InputEvent, enemy: EnemyData) -> void:
+    if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
+        return
+    if selected_card == null:
+        return
+    
+    var success := battle_manager.play_card(selected_card, enemy)
     if success:
+        print("Played %s on %s" % [selected_card.name_zh, enemy.name_zh])
+    
+    # Clear selection
+    selected_card = null
+    for child in hand_container.get_children():
+        if child is CardNode:
+            child.highlight(false)
+    
+    _refresh_ui()
+    _advance_enemy_turn_if_all_dead()
+
+
+func _advance_enemy_turn_if_all_dead() -> void:
+    ## Check if all enemies are dead, and handle enemy turns.
+    var all_dead := true
+    for enemy in battle_manager.enemies:
+        if enemy.is_alive():
+            all_dead = false
+            break
+    
+    if all_dead:
+        # Victory! Move to rewards
+        battle_manager.battle_ended.emit(true)
+    elif selected_card == null:
+        # Enemy turn: each enemy acts
+        await _execute_enemy_turns()
+        battle_manager.end_turn()
         _refresh_ui()
+
+
+func _execute_enemy_turns() -> void:
+    for enemy in battle_manager.enemies:
+        if not enemy.is_alive():
+            continue
+        
+        match enemy.current_intent:
+            EnemyData.Intent.ATTACK:
+                # Enemy attacks player (or follower if 護衛)
+                var target_hp := battle_manager.player_hp
+                var blocked := false
+                if battle_manager.follower and battle_manager.follower.is_alive() and battle_manager.follower.can_block:
+                    battle_manager.follower.take_damage(enemy.intent_value)
+                    blocked = true
+                
+                if not blocked:
+                    battle_manager.take_damage(enemy.intent_value)
+                print("%s attacks for %d damage" % [enemy.name_zh, enemy.intent_value])
+            
+            EnemyData.Intent.DEFEND:
+                enemy.heal(enemy.intent_value)  # Gain block
+                print("%s defends for %d" % [enemy.name_zh, enemy.intent_value])
+            
+            EnemyData.Intent.BUFF:
+                enemy.intent_value += 1  # Power up
+                print("%s powers up!" % enemy.name_zh)
+            
+            EnemyData.Intent.SKILL:
+                # Skill-specific behavior — placeholder
+                battle_manager.take_damage(enemy.intent_value + 1)
+                print("%s uses skill for %d damage" % [enemy.name_zh, enemy.intent_value + 1])
+        
+        # Set next turn's intent
+        enemy.current_intent = enemy.next_intent(battle_manager.turn_number + 1)
+        enemy.intent_value = 1 if enemy.current_intent != EnemyData.Intent.SKILL else 2
 
 
 func _on_end_turn_pressed() -> void:

@@ -61,6 +61,9 @@ func initialize_battle() -> void:
     # Set up follower if hero starts with one
     _setup_follower()
     
+    # Spawn test enemy
+    _spawn_test_enemy()
+    
     start_turn()
 
 
@@ -172,7 +175,10 @@ func play_card(card: CardData, target = null) -> bool:
                 CardData.SubType.SLASH:
                     if energy_used >= energy:
                         return false  # "殺" limit reached (unless 張飛 咆哮)
-                    # TODO: Apply damage to target, check 閃 response
+                    # Deal damage to target
+                    if target and target is EnemyData:
+                        target.take_damage(card.damage)
+                        print("Dealt %d damage to %s (HP: %d/%d)" % [card.damage, target.name_zh, target.current_hp, target.max_hp])
                     energy_used += 1
                 CardData.SubType.DODGE:
                     pass  # Played in response, not proactively
@@ -318,3 +324,17 @@ func _setup_follower() -> void:
                 hand.erase(card)
                 discard_pile.append(card)
                 break
+
+
+func _spawn_test_enemy() -> void:
+    ## Create a simple test enemy for prototyping.
+    var enemy := EnemyData.new()
+    enemy.id = "yellow_turban_soldier"
+    enemy.name_zh = "黃巾兵"
+    enemy.name_en = "Yellow Turban Soldier"
+    enemy.max_hp = 5
+    enemy.initialize()
+    enemy.current_intent = EnemyData.Intent.ATTACK
+    enemy.intent_value = 1
+    enemy.intent_pattern = [EnemyData.Intent.ATTACK, EnemyData.Intent.ATTACK, EnemyData.Intent.DEFEND]
+    enemies.append(enemy)
