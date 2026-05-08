@@ -33,4 +33,4 @@
 - Roguelike structure: zone progression, map nodes, gold rewards, card rewards after battle
 - Campfire: heals 30% HP between battles
 - 3 starter heroes: 趙雲, 曹操, 孫權 (skills working)
-- Next: card upgrade system, remaining 23 hero skills, full card library
+- Next: remaining 23 hero skills, full card library, shop/event nodes

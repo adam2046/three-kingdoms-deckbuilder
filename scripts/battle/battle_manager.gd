@@ -67,6 +67,8 @@ func _can_substitute(card: CardData, as_sub_type: CardData.SubType) -> bool:
 	match player_hero.id:
 		"zhao_yun":
 			return _skill_longdan_check(card, as_sub_type)
+		"guan_yu":
+			return _skill_wusheng_check(card, as_sub_type)
 	return false
 
 
@@ -114,6 +116,13 @@ func _skill_longdan_check(card: CardData, as_sub_type: CardData.SubType) -> bool
 	if card.sub_type == CardData.SubType.SLASH and as_sub_type == CardData.SubType.DODGE:
 		return true
 	if card.sub_type == CardData.SubType.DODGE and as_sub_type == CardData.SubType.SLASH:
+		return true
+	return false
+
+
+func _skill_wusheng_check(card: CardData, as_sub_type: CardData.SubType) -> bool:
+	## 關羽 武聖: Red cards (♡/♢) can be used as 殺.
+	if as_sub_type == CardData.SubType.SLASH and card.is_red():
 		return true
 	return false
 
@@ -318,15 +327,27 @@ func play_card(card: CardData, target = null) -> bool:
 	if current_phase != Phase.PLAY:
 		return false
 	
-	# Handle card by type
-	match card.card_type:
+	# Check hero skill substitution (龍膽, 武聖, 傾國, etc.)
+	# Only auto-substitute DODGE (normally unplayable) → SLASH
+	var effective_card: CardData = card
+	if card.card_type == CardData.CardType.BASIC and card.sub_type == CardData.SubType.DODGE:
+		if _can_substitute(card, CardData.SubType.SLASH):
+			effective_card = _get_substitute_card(card, CardData.SubType.SLASH)
+			match player_hero.id:
+				"zhao_yun": print("[龍膽] %s used as 殺" % card.name_zh)
+				"guan_yu": print("[武聖] %s%s used as 殺" % [card.suit_symbol(), card.name_zh])
+				_: print("[Sub] %s used as 殺" % card.name_zh)
+	
+	# Handle card by effective type
+	match effective_card.card_type:
 		CardData.CardType.BASIC:
-			match card.sub_type:
+			match effective_card.sub_type:
 				CardData.SubType.SLASH:
-					if energy_used >= energy:
-						return false  # "殺" limit reached (unless 張飛 咆哮)
+					# 張飛 咆哮: no limit on 殺 per turn
+					if player_hero.id != "zhang_fei" and energy_used >= energy:
+						return false  # "殺" limit reached
 					# Deal damage to target (with wine bonus)
-					var dmg := card.damage
+					var dmg: int = effective_card.damage
 					if wine_active:
 						dmg += 1
 						wine_active = false
@@ -337,7 +358,7 @@ func play_card(card: CardData, target = null) -> bool:
 				CardData.SubType.DODGE:
 					return false  # Can only be played in response to 殺
 				CardData.SubType.PEACH:
-					player_hp = min(player_hp + card.heal, player_max_hp)
+					player_hp = min(player_hp + effective_card.heal, player_max_hp)
 				CardData.SubType.WINE:
 					if player_hp <= 0:
 						# Self-rescue when dying
@@ -346,13 +367,13 @@ func play_card(card: CardData, target = null) -> bool:
 						# Boost next 殺
 						wine_active = true
 		CardData.CardType.STRATEGY:
-			_resolve_strategy(card, target)
+			_resolve_strategy(effective_card, target)
 		CardData.CardType.EQUIPMENT:
-			_equip_card(card)
+			_equip_card(effective_card)
 		CardData.CardType.DELAY_STRATEGY:
-			_place_in_judgment(card, target)
+			_place_in_judgment(effective_card, target)
 	
-	hand.erase(card)
+	hand.erase(card)  # Remove the original card
 	discard_pile.append(card)
 	return true
 

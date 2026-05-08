@@ -78,6 +78,22 @@ func _load_test_hero(hero_id: String = "zhao_yun") -> void:
 			hero.skill_1_name_zh = "制衡"
 			hero.skill_1_desc_zh = "棄全部手牌，摸等量牌（每回1次）"
 			hero.starting_deck = _create_starter_deck_balanced()
+		"guan_yu":
+			hero.name_zh = "關羽"
+			hero.max_hp = 4
+			hero.faction = HeroData.Faction.SHU
+			hero.archetype = HeroData.Archetype.ATTACK
+			hero.skill_1_name_zh = "武聖"
+			hero.skill_1_desc_zh = "紅色牌可當作殺使用"
+			hero.starting_deck = _create_starter_deck_attack()
+		"zhang_fei":
+			hero.name_zh = "張飛"
+			hero.max_hp = 4
+			hero.faction = HeroData.Faction.SHU
+			hero.archetype = HeroData.Archetype.ATTACK
+			hero.skill_1_name_zh = "咆哮"
+			hero.skill_1_desc_zh = "出殺無次數限制"
+			hero.starting_deck = _create_starter_deck_attack()
 	
 	battle_manager.player_hero = hero
 
@@ -91,6 +107,22 @@ func _create_starter_deck_balanced() -> Array[CardData]:
 		"dismantle_spade_3", "steal_spade_4", "draw2_club_7",
 		"duel_spade_A", "barbarian_spade_7", "peach_garden_heart_A",
 		"negate_club_Q",
+	]
+	for cid in card_ids:
+		var card := _create_test_card(cid)
+		if card:
+			deck.append(card)
+	return deck
+
+
+func _create_starter_deck_attack() -> Array[CardData]:
+	## Attack-type starter: 5 殺, 2 閃, 1 桃, 1 酒, 1 決鬥 = 10 cards
+	var deck: Array[CardData] = []
+	var card_ids := [
+		"slash_spade_7", "slash_heart_10", "slash_club_4", "slash_diamond_8", "slash_club_5",
+		"dodge_heart_2", "dodge_diamond_6",
+		"peach_heart_4", "wine_spade_3",
+		"duel_spade_A",
 	]
 	for cid in card_ids:
 		var card := _create_test_card(cid)
@@ -326,7 +358,12 @@ var selected_card: CardData = null  # Card currently selected for targeting
 func _card_needs_target(card: CardData) -> bool:
 	match card.card_type:
 		CardData.CardType.BASIC:
-			return card.sub_type == CardData.SubType.SLASH
+			if card.sub_type == CardData.SubType.SLASH:
+				return true
+			# 龍膽: 閃 can be used as 殺 — needs target
+			if card.sub_type == CardData.SubType.DODGE and battle_manager._can_substitute(card, CardData.SubType.SLASH):
+				return true
+			return false
 		CardData.CardType.STRATEGY:
 			return card.sub_type in [CardData.SubType.DISMANTLE, CardData.SubType.STEAL, CardData.SubType.DUEL]
 		_:
@@ -342,8 +379,8 @@ func _on_card_played(card: CardData) -> void:
 	var needs_target := _card_needs_target(card)
 	
 	if needs_target:
-		# Block selection if 殺 limit reached
-		if card.sub_type == CardData.SubType.SLASH and battle_manager.energy_used >= battle_manager.energy:
+		# Block selection if 殺 limit reached (unless 張飛 咆哮)
+		if card.sub_type == CardData.SubType.SLASH and battle_manager.player_hero.id != "zhang_fei" and battle_manager.energy_used >= battle_manager.energy:
 			print("[Blocked] 殺 limit reached (%d/%d)" % [battle_manager.energy_used, battle_manager.energy])
 			return
 		selected_card = card
