@@ -373,7 +373,7 @@ func _card_needs_target(card: CardData) -> bool:
 func _on_card_played(card: CardData) -> void:
 	## Player clicks a card. If needs target, select and wait for enemy click.
 	## If no target (peach, draw2), play immediately.
-	if reward_active or battle_manager.current_phase != BattleManager.Phase.PLAY:
+	if reward_active or shop_active or battle_manager.current_phase != BattleManager.Phase.PLAY:
 		return
 	
 	var needs_target := _card_needs_target(card)
@@ -473,6 +473,8 @@ func _on_node_changed(node_type: int, node_index: int) -> void:
 			print("[Campfire] Healed %d HP (now %d/%d)" % [heal_amount, battle_manager.player_hp, battle_manager.player_max_hp])
 			battle_manager.upgrade_random_card()
 			map_manager.advance_to_next_node()
+		5:  # SHOP=5
+			_show_shop()  # Player interacts, then advance is called from shop handlers
 		_:
 			map_manager.advance_to_next_node()  # Skip unsupported nodes for now
 
@@ -597,3 +599,76 @@ func _generate_reward_cards(count: int) -> Array:
 			pool.append(card)
 	
 	return pool
+
+
+# ============================================================
+#  SHOP SYSTEM
+# ============================================================
+
+const SHOP_CARD_PRICE: int = 5
+var shop_active: bool = false
+
+
+func _show_shop() -> void:
+	## Display shop with 3 cards for purchase.
+	shop_active = true
+	_reward_cards = _generate_reward_cards(3)
+	
+	# Clear previous cards
+	for child in reward_container.get_children():
+		child.queue_free()
+	
+	# Show overlay with shop styling
+	reward_overlay.visible = true
+	reward_title.text = "商店 — 金幣: %d  (每張 %d 金)" % [map_manager.get_gold(), SHOP_CARD_PRICE]
+	
+	# Create card nodes with price labels
+	for card in _reward_cards:
+		var vbox := VBoxContainer.new()
+		var card_node = CardNode.new()
+		card_node.setup(card)
+		card_node.card_clicked.connect(_on_shop_card_bought)
+		vbox.add_child(card_node)
+		
+		var price_label := Label.new()
+		price_label.text = "%d 金" % SHOP_CARD_PRICE
+		price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		price_label.add_theme_font_size_override("font_size", 16)
+		vbox.add_child(price_label)
+		
+		reward_container.add_child(vbox)
+	
+	# Hide battle UI
+	end_turn_btn.visible = false
+	skill_btn.visible = false
+
+
+func _on_shop_card_bought(card: CardData) -> void:
+	## Player clicked a shop card — buy it if enough gold.
+	if not map_manager.run_data.spend_gold(SHOP_CARD_PRICE):
+		print("[Shop] Not enough gold!")
+		return
+	
+	battle_manager.deck.append(card)
+	print("[Shop] Bought %s for %d gold (remaining: %d)" % [card.name_zh, SHOP_CARD_PRICE, map_manager.get_gold()])
+	reward_title.text = "商店 — 金幣: %d  (已購買 %s!)" % [map_manager.get_gold(), card.name_zh]
+	
+	# Refresh gold display
+	if gold_label:
+		gold_label.text = "💰 %d" % map_manager.get_gold()
+	
+	# Auto-close after purchase (one item per shop for MVP)
+	await get_tree().create_timer(0.5).timeout
+	_hide_shop()
+
+
+func _hide_shop() -> void:
+	## Hide shop overlay and advance to next node.
+	reward_overlay.visible = false
+	shop_active = false
+	
+	for child in reward_container.get_children():
+		child.queue_free()
+	_reward_cards.clear()
+	
+	map_manager.advance_to_next_node()
