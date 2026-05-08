@@ -34,6 +34,7 @@ func _ready() -> void:
     custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
     _ensure_children()
     gui_input.connect(_on_gui_input)
+    # Only refresh if setup() was already called before _ready
     if card_data != null:
         _refresh_display()
 
