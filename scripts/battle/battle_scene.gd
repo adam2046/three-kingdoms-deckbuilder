@@ -123,6 +123,103 @@ func _load_test_hero(hero_id: String = "zhao_yun") -> void:
 			hero.skill_1_name_zh = "烈弓"
 			hero.skill_1_desc_zh = "手牌數≥目標體力值時，殺傷害+1"
 			hero.starting_deck = _create_starter_deck_attack()
+		"liu_bei":
+			hero.name_zh = "劉備"
+			hero.max_hp = 4
+			hero.faction = HeroData.Faction.SHU
+			hero.archetype = HeroData.Archetype.SUPPORT
+			hero.skill_1_name_zh = "仁德"
+			hero.skill_1_desc_zh = "give cards to heal"
+			hero.starting_deck = _create_starter_deck_balanced()
+		"zhuge_liang":
+			hero.name_zh = "諸葛亮"
+			hero.max_hp = 3
+			hero.faction = HeroData.Faction.SHU
+			hero.archetype = HeroData.Archetype.CONTROL
+			hero.skill_1_name_zh = "觀星"
+			hero.skill_1_desc_zh = "see top 5, reorder"
+			hero.starting_deck = _create_starter_deck_balanced()
+		"sim_yi":
+			hero.name_zh = "司馬懿"
+			hero.max_hp = 3
+			hero.faction = HeroData.Faction.WEI
+			hero.archetype = HeroData.Archetype.CONTROL
+			hero.skill_1_name_zh = "反饋"
+			hero.skill_1_desc_zh = "take damage → steal enemy card"
+			hero.starting_deck = _create_starter_deck_balanced()
+		"xiahou_dun":
+			hero.name_zh = "夏侯惇"
+			hero.max_hp = 4
+			hero.faction = HeroData.Faction.WEI
+			hero.archetype = HeroData.Archetype.ATTACK
+			hero.skill_1_name_zh = "剛烈"
+			hero.skill_1_desc_zh = "take damage → deal 1 back"
+			hero.starting_deck = _create_starter_deck_attack()
+		"zhen_ji":
+			hero.name_zh = "甄姬"
+			hero.max_hp = 3
+			hero.faction = HeroData.Faction.WEI
+			hero.archetype = HeroData.Archetype.DEFENSE
+			hero.skill_1_name_zh = "傾國"
+			hero.skill_1_desc_zh = "black cards → 閃"
+			hero.starting_deck = _create_starter_deck_balanced()
+		"guo_jia":
+			hero.name_zh = "郭嘉"
+			hero.max_hp = 3
+			hero.faction = HeroData.Faction.WEI
+			hero.archetype = HeroData.Archetype.SUPPORT
+			hero.skill_1_name_zh = "天妒"
+			hero.skill_1_desc_zh = "draw 2 when damaged"
+			hero.starting_deck = _create_starter_deck_balanced()
+		"zhou_yu":
+			hero.name_zh = "周瑜"
+			hero.max_hp = 3
+			hero.faction = HeroData.Faction.WU
+			hero.archetype = HeroData.Archetype.CONTROL
+			hero.skill_1_name_zh = "反間"
+			hero.skill_1_desc_zh = "guess suit or take 1 dmg"
+			hero.starting_deck = _create_starter_deck_balanced()
+		"lu_xun":
+			hero.name_zh = "陸遜"
+			hero.max_hp = 3
+			hero.faction = HeroData.Faction.WU
+			hero.archetype = HeroData.Archetype.CONTROL
+			hero.skill_1_name_zh = "連營"
+			hero.skill_1_desc_zh = "last card → draw 2"
+			hero.starting_deck = _create_starter_deck_balanced()
+		"huang_gai":
+			hero.name_zh = "黃蓋"
+			hero.max_hp = 4
+			hero.faction = HeroData.Faction.WU
+			hero.archetype = HeroData.Archetype.ATTACK
+			hero.skill_1_name_zh = "苦肉"
+			hero.skill_1_desc_zh = "lose 1 HP → draw 2"
+			hero.starting_deck = _create_starter_deck_attack()
+		"da_qiao":
+			hero.name_zh = "大喬"
+			hero.max_hp = 3
+			hero.faction = HeroData.Faction.WU
+			hero.archetype = HeroData.Archetype.CONTROL
+			hero.skill_1_name_zh = "國色"
+			hero.skill_1_desc_zh = "diamond cards → 樂"
+			hero.starting_deck = _create_starter_deck_balanced()
+		"diao_chan":
+			hero.name_zh = "貂蟬"
+			hero.max_hp = 3
+			hero.faction = HeroData.Faction.QUN
+			hero.archetype = HeroData.Archetype.CONTROL
+			hero.skill_1_name_zh = "離間"
+			hero.skill_1_desc_zh = "force 2 enemies to duel"
+			hero.starting_deck = _create_starter_deck_balanced()
+		_:
+			# Fallback: treat unknown heroes as balanced
+			hero.name_zh = hero_id
+			hero.max_hp = 4
+			hero.faction = HeroData.Faction.SHU
+			hero.archetype = HeroData.Archetype.BALANCED
+			hero.skill_1_name_zh = "—"
+			hero.skill_1_desc_zh = ""
+			hero.starting_deck = _create_starter_deck_balanced()
 	
 	battle_manager.player_hero = hero
 
