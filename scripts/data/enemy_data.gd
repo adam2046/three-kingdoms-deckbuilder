@@ -14,7 +14,7 @@ class_name EnemyData
 
 # -- AI Intent pattern --
 enum Intent { ATTACK, DEFEND, BUFF, SKILL }
-@export var intent_pattern: Array[Intent] = [Intent.ATTACK]  # Default: attack every turn
+@export var intent_pattern: Array = [Intent.ATTACK]  # Default: attack every turn
 
 # -- Current state (runtime) --
 var current_hp: int
@@ -34,7 +34,7 @@ func heal(amount: int) -> void:
 func is_alive() -> bool:
     return current_hp > 0
 
-func next_intent(turn: int) -> Intent:
+func next_intent(turn: int) -> int:
     ## Cycle through intent pattern or use skill AI
     var idx: int = (turn - 1) % intent_pattern.size()
     return intent_pattern[idx]
