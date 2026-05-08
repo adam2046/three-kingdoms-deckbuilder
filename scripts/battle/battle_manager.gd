@@ -243,6 +243,15 @@ func _has_dodge_in_hand() -> bool:
 	return false
 
 
+func _has_crossbow() -> bool:
+	## Check if 諸葛連弩 is equipped.
+	if equipment_slots.has("weapon"):
+		var wp = equipment_slots["weapon"]
+		if wp.id == "zhuge_crossbow":
+			return true
+	return false
+
+
 func use_dodge(card: CardData) -> bool:
 	## Player uses a 閃 to block the current enemy attack.
 	if card.sub_type != CardData.SubType.DODGE:
@@ -382,8 +391,8 @@ func play_card(card: CardData, target = null) -> bool:
 		CardData.CardType.BASIC:
 			match effective_card.sub_type:
 				CardData.SubType.SLASH:
-					# 張飛 咆哮: no limit on 殺 per turn
-					if player_hero.id != "zhang_fei" and energy_used >= energy:
+					# 張飛 咆哮 / 諸葛連弩: no limit on 殺 per turn
+					if player_hero.id != "zhang_fei" and not _has_crossbow() and energy_used >= energy:
 						return false  # "殺" limit reached
 					# Deal damage to target (with wine bonus)
 					var dmg: int = effective_card.damage
@@ -397,6 +406,10 @@ func play_card(card: CardData, target = null) -> bool:
 							if target and target is EnemyData and hand.size() >= target.current_hp:
 								dmg += 1
 								print("[烈弓] Bonus damage! Hand %d >= enemy HP %d" % [hand.size(), target.current_hp])
+					# Equipment: weapon gives +1 damage
+					if equipment_slots.has("weapon"):
+						dmg += 1
+						print("[Weapon] +1 damage from %s" % equipment_slots["weapon"].name_zh)
 					if target and target is EnemyData:
 						target.take_damage(dmg)
 						print("Dealt %d damage to %s (HP: %d/%d)" % [dmg, target.name_zh, target.current_hp, target.max_hp])
@@ -673,13 +686,17 @@ func _aoe_damage(amount: int) -> void:
 
 
 func take_damage(amount: int) -> void:
-	## Apply damage to player, reduced by block first.
+	## Apply damage to player, reduced by block and armor first.
 	var effective: int = amount
 	if block > 0:
 		var absorbed: int = min(amount, block)
 		block -= absorbed
 		effective -= absorbed
 		print("[Block] Absorbed %d damage, %d block remaining" % [absorbed, block])
+	# Armor reduces damage by 1
+	if equipment_slots.has("armor") and effective > 0:
+		effective -= 1
+		print("[Armor] %s reduced damage by 1" % equipment_slots["armor"].name_zh)
 	player_hp = max(0, player_hp - effective)
 	_on_damage_taken(effective)  # Trigger hero skill reactions (e.g. 奸雄)
 	if player_hp <= 0:

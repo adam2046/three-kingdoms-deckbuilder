@@ -135,7 +135,7 @@ func _create_starter_deck_balanced() -> Array[CardData]:
 		"peach_heart_4", "wine_spade_3",
 		"dismantle_spade_3", "steal_spade_4", "draw2_club_7",
 		"duel_spade_A", "barbarian_spade_7", "peach_garden_heart_A",
-		"negate_club_Q",
+		"negate_club_Q", "weapon_spade_A",
 	]
 	for cid in card_ids:
 		var card := _create_test_card(cid)
@@ -230,6 +230,22 @@ func _create_test_card(card_id: String) -> CardData:
 			card.card_type = CardData.CardType.STRATEGY
 			card.sub_type = CardData.SubType.NEGATE
 			card.name_zh = "無懈可擊"
+		"weapon":
+			card.card_type = CardData.CardType.EQUIPMENT
+			card.sub_type = CardData.SubType.WEAPON
+			card.name_zh = "武器"
+			card.attack_range = 1
+		"armor":
+			card.card_type = CardData.CardType.EQUIPMENT
+			card.sub_type = CardData.SubType.ARMOR
+			card.name_zh = "防具"
+			card.block = 1
+		"crossbow":
+			card.card_type = CardData.CardType.EQUIPMENT
+			card.sub_type = CardData.SubType.WEAPON
+			card.name_zh = "諸葛連弩"
+			card.attack_range = 1
+			card.id = "zhuge_crossbow"
 		_:
 			card.name_zh = "?"
 	
@@ -416,8 +432,8 @@ func _on_card_played(card: CardData) -> void:
 	var needs_target := _card_needs_target(card)
 	
 	if needs_target:
-		# Block selection if 殺 limit reached (unless 張飛 咆哮)
-		if card.sub_type == CardData.SubType.SLASH and battle_manager.player_hero.id != "zhang_fei" and battle_manager.energy_used >= battle_manager.energy:
+		# Block selection if 殺 limit reached (unless 張飛 咆哮 or 諸葛連弩)
+		if card.sub_type == CardData.SubType.SLASH and battle_manager.player_hero.id != "zhang_fei" and not battle_manager._has_crossbow() and battle_manager.energy_used >= battle_manager.energy:
 			print("[Blocked] 殺 limit reached (%d/%d)" % [battle_manager.energy_used, battle_manager.energy])
 			return
 		selected_card = card
@@ -650,6 +666,9 @@ func _generate_reward_cards(count: int) -> Array:
 		{"id": "negate_spade_J", "type": "negate", "suit": "spade", "num": "J"},
 		{"id": "negate_club_Q", "type": "negate", "suit": "club", "num": "Q"},
 		{"id": "negate_diamond_K", "type": "negate", "suit": "diamond", "num": "K"},
+		{"id": "weapon_spade_A", "type": "weapon", "suit": "spade", "num": "A"},
+		{"id": "armor_spade_2", "type": "armor", "suit": "spade", "num": "2"},
+		{"id": "crossbow_spade_A", "type": "crossbow", "suit": "spade", "num": "A"},
 	]
 	
 	templates.shuffle()
