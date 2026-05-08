@@ -430,11 +430,11 @@ func _on_node_changed(node_type: int, node_index: int) -> void:
 			# Only auto-start battles. Campfire/shop/event are handled separately.
 			_start_battle()
 		2:  # CAMPFIRE=2
-			# Heal 30% max HP (rounded up)
-			var heal_amount: int = max(1, ceil(battle_manager.player_max_hp * 0.3))
+			# Heal 20% max HP (rounded up) + upgrade 1 random card
+			var heal_amount: int = max(1, ceil(battle_manager.player_max_hp * 0.2))
 			battle_manager.player_hp = min(battle_manager.player_hp + heal_amount, battle_manager.player_max_hp)
 			print("[Campfire] Healed %d HP (now %d/%d)" % [heal_amount, battle_manager.player_hp, battle_manager.player_max_hp])
-			# TODO: Offer card upgrade option
+			battle_manager.upgrade_random_card()
 			map_manager.advance_to_next_node()
 		_:
 			map_manager.advance_to_next_node()  # Skip unsupported nodes for now

@@ -479,6 +479,103 @@ func _award_victory_gold() -> void:
 	print("[Gold] +%d (total: %d)" % [amount, map_manager.get_gold()])
 
 
+func upgrade_random_card() -> bool:
+	## Pick a random card from the deck and upgrade it.
+	## Returns true if an upgrade happened.
+	if deck.is_empty():
+		print("[Upgrade] Deck is empty — nothing to upgrade")
+		return false
+	
+	var index: int = randi() % deck.size()
+	var old_card: CardData = deck[index]
+	var upgraded := _create_upgraded_card(old_card)
+	
+	if upgraded == null or upgraded == old_card:
+		print("[Upgrade] %s has no upgrade variant" % old_card.name_zh)
+		return false
+	
+	deck[index] = upgraded
+	print("[Upgrade] %s → %s (damage:%d heal:%d block:%d)" % [
+		old_card.name_zh, upgraded.name_zh,
+		upgraded.damage, upgraded.heal, upgraded.block
+	])
+	return true
+
+
+func _create_upgraded_card(card: CardData) -> CardData:
+	## Return an upgraded copy of the card. Returns original if no upgrade defined.
+	var up := card.duplicate()
+	var changed := false
+	
+	match card.sub_type:
+		CardData.SubType.SLASH:
+			up.damage += 1
+			up.name_zh = card.name_zh + "+"
+			changed = true
+		CardData.SubType.DODGE:
+			up.block += 1
+			up.name_zh = card.name_zh + "+"
+			changed = true
+		CardData.SubType.PEACH:
+			up.heal += 1
+			up.name_zh = card.name_zh + "+"
+			changed = true
+		CardData.SubType.WINE:
+			up.damage += 1
+			up.name_zh = card.name_zh + "+"
+			changed = true
+		CardData.SubType.DISMANTLE:
+			up.discard_count += 1
+			up.name_zh = card.name_zh + "+"
+			changed = true
+		CardData.SubType.STEAL:
+			up.draw_count = 2
+			up.name_zh = card.name_zh + "+"
+			changed = true
+		CardData.SubType.DRAW2:
+			up.draw_count = 3
+			up.name_zh = card.name_zh + "+"
+			changed = true
+		CardData.SubType.DUEL:
+			up.damage += 1
+			up.name_zh = card.name_zh + "+"
+			changed = true
+		CardData.SubType.BARBARIAN:
+			up.damage += 1
+			up.name_zh = card.name_zh + "+"
+			changed = true
+		CardData.SubType.VOLLEY:
+			up.damage += 1
+			up.name_zh = card.name_zh + "+"
+			changed = true
+		CardData.SubType.PEACH_GARDEN:
+			up.heal += 1
+			up.name_zh = card.name_zh + "+"
+			changed = true
+		CardData.SubType.HARVEST:
+			up.draw_count = card.draw_count + 1
+			up.name_zh = card.name_zh + "+"
+			changed = true
+		CardData.SubType.NEGATE:
+			up.block = 3
+			up.name_zh = card.name_zh + "+"
+			changed = true
+		CardData.SubType.WEAPON:
+			up.attack_range += 1
+			up.name_zh = card.name_zh + "+"
+			changed = true
+		CardData.SubType.ARMOR:
+			up.block += 1
+			up.name_zh = card.name_zh + "+"
+			changed = true
+	
+	if changed:
+		up.rarity = CardData.Rarity.RARE
+		up.id = card.id + "+"
+		return up
+	return card
+
+
 func shuffle_deck() -> void:
 	deck.shuffle()
 

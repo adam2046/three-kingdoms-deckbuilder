@@ -1,0 +1,3 @@
+res://scripts/battle/battle_manager.gd
+res://scripts/battle/battle_scene.gd
+res://scripts/data/enemy_data.gd
