@@ -390,6 +390,13 @@ func play_card(card: CardData, target = null) -> bool:
 					if wine_active:
 						dmg += 1
 						wine_active = false
+					# Hero skill damage modifiers
+					match player_hero.id:
+						"lv_bu": dmg += 1  # 無雙: overwhelming force
+						"huang_zhong":
+							if target and target is EnemyData and hand.size() >= target.current_hp:
+								dmg += 1
+								print("[烈弓] Bonus damage! Hand %d >= enemy HP %d" % [hand.size(), target.current_hp])
 					if target and target is EnemyData:
 						target.take_damage(dmg)
 						print("Dealt %d damage to %s (HP: %d/%d)" % [dmg, target.name_zh, target.current_hp, target.max_hp])
@@ -437,8 +444,11 @@ func _resolve_strategy(card: CardData, target) -> void:
 			# 決鬥: Force target into a duel — take 1 damage if they can't fight back
 			# PvE: deal 2 damage (simulates the back-and-forth of a duel)
 			if target and target is EnemyData and target.is_alive():
-				target.take_damage(2)
-				print("[決鬥] %s takes 2 duel damage (HP: %d/%d)" % [target.name_zh, target.current_hp, target.max_hp])
+				var duel_dmg: int = 2
+				if player_hero.id == "lv_bu":
+					duel_dmg += 1  # 無雙: overwhelming duel
+				target.take_damage(duel_dmg)
+				print("[決鬥] %s takes %d duel damage (HP: %d/%d)" % [target.name_zh, duel_dmg, target.current_hp, target.max_hp])
 		CardData.SubType.BARBARIAN:
 			# 南蠻入侵: All enemies must play 殺 or take 1 damage
 			_aoe_damage(1)

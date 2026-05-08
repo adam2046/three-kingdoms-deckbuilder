@@ -97,6 +97,32 @@ func _load_test_hero(hero_id: String = "zhao_yun") -> void:
 			hero.skill_1_name_zh = "咆哮"
 			hero.skill_1_desc_zh = "出殺無次數限制"
 			hero.starting_deck = _create_starter_deck_attack()
+		"lv_bu":
+			hero.name_zh = "呂布"
+			hero.max_hp = 4
+			hero.faction = HeroData.Faction.QUN
+			hero.archetype = HeroData.Archetype.ATTACK
+			hero.skill_1_name_zh = "無雙"
+			hero.skill_1_desc_zh = "殺傷害+1，決鬥傷害+1"
+			hero.starting_deck = _create_starter_deck_attack()
+		"ma_chao":
+			hero.name_zh = "馬超"
+			hero.max_hp = 4
+			hero.faction = HeroData.Faction.SHU
+			hero.archetype = HeroData.Archetype.ATTACK
+			hero.skill_1_name_zh = "馬術"
+			hero.skill_1_desc_zh = "攻擊距離-1（鎖定技）"
+			hero.skill_2_name_zh = "鐵騎"
+			hero.skill_2_desc_zh = "使用殺後判定：紅牌則傷害+1"
+			hero.starting_deck = _create_starter_deck_attack()
+		"huang_zhong":
+			hero.name_zh = "黃忠"
+			hero.max_hp = 4
+			hero.faction = HeroData.Faction.SHU
+			hero.archetype = HeroData.Archetype.ATTACK
+			hero.skill_1_name_zh = "烈弓"
+			hero.skill_1_desc_zh = "手牌數≥目標體力值時，殺傷害+1"
+			hero.starting_deck = _create_starter_deck_attack()
 	
 	battle_manager.player_hero = hero
 
