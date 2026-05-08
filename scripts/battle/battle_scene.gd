@@ -534,6 +534,8 @@ func _on_node_changed(node_type: int, node_index: int) -> void:
 			map_manager.advance_to_next_node()
 		5:  # SHOP=5
 			_show_shop()  # Player interacts, then advance is called from shop handlers
+		6:  # EVENT=6
+			_resolve_event()
 		_:
 			map_manager.advance_to_next_node()  # Skip unsupported nodes for now
 
@@ -731,3 +733,97 @@ func _hide_shop() -> void:
 	_reward_cards.clear()
 	
 	map_manager.advance_to_next_node()
+
+
+# ============================================================
+#  EVENT SYSTEM
+# ============================================================
+
+func _resolve_event() -> void:
+	## Pick a random event and apply its effect.
+	var events := [
+		"_event_borrow_arrows",
+		"_event_three_visits",
+		"_event_empty_city",
+		"_event_wine_discussion",
+		"_event_peach_garden_oath",
+		"_event_wine_slash",
+	]
+	var event_name: String = events[randi() % events.size()]
+	call(event_name)
+	map_manager.advance_to_next_node()
+
+
+func _event_borrow_arrows() -> void:
+	## 草船借箭: 50% gain 2 cards, 50% lose 5 gold
+	if randi() % 2 == 0:
+		battle_manager.draw_cards(2)
+		phase_label.text = "草船借箭: 獲得2張牌!"
+	else:
+		map_manager.run_data.spend_gold(5)
+		phase_label.text = "草船借箭: 失去5金幣..."
+	print("[Event] 草船借箭: %s" % phase_label.text)
+
+
+func _event_three_visits() -> void:
+	## 三顧茅廬: Gain a follower if you don't have one
+	if battle_manager.follower and battle_manager.follower.is_alive():
+		phase_label.text = "三顧茅廬: 已有隨從, 無事發生"
+	else:
+		var f = Follower.new()
+		f.name_zh = "義勇兵"
+		f.hp = 3
+		f.max_hp = 3
+		f.passive_desc = "每回合對隨機敵方造成1點傷害"
+		f.can_block = false
+		battle_manager.follower = f
+		phase_label.text = "三顧茅廬: 獲得義勇兵!"
+	print("[Event] 三顧茅廬")
+
+
+func _event_empty_city() -> void:
+	## 空城計: Heal 50% max HP
+	var heal_amount: int = max(1, ceil(battle_manager.player_max_hp * 0.5))
+	battle_manager.player_hp = min(battle_manager.player_hp + heal_amount, battle_manager.player_max_hp)
+	phase_label.text = "空城計: 回復 %d 體力!" % heal_amount
+	print("[Event] 空城計: healed %d" % heal_amount)
+
+
+func _event_wine_discussion() -> void:
+	## 煮酒論英雄: Random buff/debuff
+	if randi() % 2 == 0:
+		battle_manager.player_max_hp += 1
+		battle_manager.player_hp += 1
+		phase_label.text = "煮酒論英雄: 體力上限+1!"
+	else:
+		battle_manager.player_max_hp = max(1, battle_manager.player_max_hp - 1)
+		phase_label.text = "煮酒論英雄: 體力上限-1..."
+	print("[Event] 煮酒論英雄: max HP now %d" % battle_manager.player_max_hp)
+
+
+func _event_peach_garden_oath() -> void:
+	## 桃園結義: Full heal + gain 1 桃
+	battle_manager.player_hp = battle_manager.player_max_hp
+	var peach := _create_test_card("peach_heart_Q")
+	if peach:
+		battle_manager.deck.append(peach)
+	phase_label.text = "桃園結義: 完全回復! +1桃"
+	print("[Event] 桃園結義: full heal")
+
+
+func _event_wine_slash() -> void:
+	## 溫酒斬華雄: If have 酒 in hand, gain 10 gold. Otherwise gain 1 酒.
+	var has_wine := false
+	for card in battle_manager.hand:
+		if card.sub_type == CardData.SubType.WINE:
+			has_wine = true
+			break
+	if has_wine:
+		map_manager.add_gold(10)
+		phase_label.text = "溫酒斬華雄: 有酒! 獲得10金幣"
+	else:
+		var wine := _create_test_card("wine_spade_3")
+		if wine:
+			battle_manager.deck.append(wine)
+		phase_label.text = "溫酒斬華雄: 獲得1張酒"
+	print("[Event] 溫酒斬華雄")

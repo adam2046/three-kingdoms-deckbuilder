@@ -49,7 +49,7 @@ static func zone_1() -> ZoneDef:
 	nodes.append(NodeDef.new(NodeType.SHOP, "商店", "Shop"))
 	nodes.append(NodeDef.new(NodeType.CAMPFIRE, "營火", "Campfire"))
 	nodes.append(NodeDef.new(NodeType.ELITE, "黃巾精銳", "Elite Guard", ["yellow_turban_elite"]))
-	nodes.append(NodeDef.new(NodeType.BATTLE, "遭遇戰", "Skirmish", ["yellow_turban_soldier"]))
+	nodes.append(NodeDef.new(NodeType.EVENT, "事件", "Event"))
 	nodes.append(NodeDef.new(NodeType.BOSS, "張角", "Zhang Jiao", ["zhang_jiao"]))
 	return ZoneDef.new("zone_1", "黃巾之亂", "Yellow Turban Rebellion", nodes, "zhang_jiao")
 
