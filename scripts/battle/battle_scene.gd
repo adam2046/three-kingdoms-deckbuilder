@@ -46,7 +46,7 @@ func _ready() -> void:
 	map_manager.gold_changed.connect(_on_gold_changed)
 	
 	# Load test hero BEFORE starting run (run triggers first battle)
-	_load_test_hero("zhao_yun")  # Options: zhao_yun, cao_cao, sun_quan
+	_load_test_hero(PlayerData.chosen_hero_id)  # Hero chosen on select screen
 	
 	# Now start the roguelike run — triggers _on_node_changed → _start_battle
 	map_manager.start_run()

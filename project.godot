@@ -13,9 +13,13 @@ config_version=5
 config/name="Three Kingdoms Deckbuilder"
 config/description="A roguelike deckbuilder set in the Three Kingdoms era. Build your deck, command legendary heroes, and unify China."
 config/tags=PackedStringArray("roguelike", "deckbuilder", "card_game", "three_kingdoms", "2d")
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/menu/main_menu.tscn"
 config/features=PackedStringArray("4.6")
 config/icon="res://icon.svg"
+
+[autoload]
+
+PlayerData="*res://scripts/data/player_data.gd"
 
 [display]
 
