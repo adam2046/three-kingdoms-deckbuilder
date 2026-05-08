@@ -14,6 +14,8 @@ class_name BattleManager
 signal turn_started(turn_number: int)
 signal phase_changed(phase: Phase)
 signal battle_ended(victory: bool)
+signal awaiting_dodge(enemy_name: String, damage: int)  # Player can respond with 閃
+signal dodge_response_received()  # Internal: player responded
 
 # -- Enums --
 enum Phase { JUDGMENT, DRAW, PLAY, DISCARD, END }
@@ -29,6 +31,7 @@ var wine_active: bool = false   # Next 殺 deals +1 damage
 var hand_size_limit: int     # = player_hp normally
 var attack_limit_reached: bool = false  # for 呂布 無雙
 var block: int = 0            # Damage absorption (from 無懈可擊)
+var dodge_used_this_attack: bool = false  # Track if player used 閃 this attack
 
 # -- References --
 var player_hero: HeroData
@@ -215,13 +218,49 @@ func _execute_enemy_turns() -> void:
 
 
 func _enemy_attack(enemy: EnemyData) -> void:
+	## Enemy attacks — player can respond with 閃 to block.
 	var blocked := false
 	if follower and follower.is_alive() and follower.can_block:
 		follower.take_damage(enemy.intent_value)
 		blocked = true
 	
 	if not blocked:
-		take_damage(enemy.intent_value)
+		# Check if player has 閃 in hand — if so, offer response
+		if _has_dodge_in_hand():
+			dodge_used_this_attack = false
+			awaiting_dodge.emit(enemy.name_zh, enemy.intent_value)
+			await dodge_response_received  # Pause until player responds
+			blocked = dodge_used_this_attack
+		
+		if not blocked:
+			take_damage(enemy.intent_value)
+
+
+func _has_dodge_in_hand() -> bool:
+	for card in hand:
+		if card.sub_type == CardData.SubType.DODGE:
+			return true
+	return false
+
+
+func use_dodge(card: CardData) -> bool:
+	## Player uses a 閃 to block the current enemy attack.
+	if card.sub_type != CardData.SubType.DODGE:
+		return false
+	if not hand.has(card):
+		return false
+	hand.erase(card)
+	discard_pile.append(card)
+	dodge_used_this_attack = true
+	print("[Dodge] %s blocks the attack!" % card.name_zh)
+	dodge_response_received.emit()
+	return true
+
+
+func skip_dodge() -> void:
+	## Player chooses not to block — take full damage.
+	dodge_used_this_attack = false
+	dodge_response_received.emit()
 
 
 func _enemy_skill(enemy: EnemyData) -> void:

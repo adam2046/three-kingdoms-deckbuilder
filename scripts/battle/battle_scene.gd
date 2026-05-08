@@ -26,6 +26,7 @@ class_name BattleScene
 @onready var reward_title: Label = $UI/RewardOverlay/RewardTitle
 
 var reward_active: bool = false  # Blocks battle interaction while choosing reward
+var dodge_response_active: bool = false  # Blocks normal play during enemy attack response
 
 
 func _ready() -> void:
@@ -33,6 +34,8 @@ func _ready() -> void:
 	battle_manager.turn_started.connect(_on_turn_started)
 	battle_manager.phase_changed.connect(_on_phase_changed)
 	battle_manager.battle_ended.connect(_on_battle_ended)
+	battle_manager.awaiting_dodge.connect(_on_awaiting_dodge)
+	battle_manager.dodge_response_received.connect(_on_dodge_resolved)
 	end_turn_btn.pressed.connect(_on_end_turn_pressed)
 	skill_btn.pressed.connect(_on_skill_pressed)
 	skill_btn.visible = false
@@ -373,6 +376,14 @@ func _card_needs_target(card: CardData) -> bool:
 func _on_card_played(card: CardData) -> void:
 	## Player clicks a card. If needs target, select and wait for enemy click.
 	## If no target (peach, draw2), play immediately.
+	
+	# During dodge response: only 閃 is playable
+	if dodge_response_active:
+		if card.sub_type == CardData.SubType.DODGE:
+			battle_manager.use_dodge(card)
+			_refresh_hand()
+		return
+	
 	if reward_active or shop_active or battle_manager.current_phase != BattleManager.Phase.PLAY:
 		return
 	
@@ -419,6 +430,11 @@ func _on_enemy_clicked(event: InputEvent, enemy: EnemyData) -> void:
 
 
 func _on_end_turn_pressed() -> void:
+	## Player clicks "End Turn" or "Take Damage" during dodge response.
+	if dodge_response_active:
+		battle_manager.skip_dodge()
+		return
+	
 	## Player clicks "End Turn" — move to discard phase, then enemies act.
 	if battle_manager.current_phase != BattleManager.Phase.PLAY:
 		return
@@ -446,6 +462,23 @@ func _on_battle_ended(victory: bool) -> void:
 	else:
 		print("DEFEAT... Run over.")
 		# TODO: Show defeat screen, offer restart
+
+
+func _on_awaiting_dodge(enemy_name: String, damage: int) -> void:
+	## Enemy is attacking — enable dodge response mode.
+	dodge_response_active = true
+	phase_label.text = "%s 攻擊! 傷害 %d — 出閃?" % [enemy_name, damage]
+	end_turn_btn.text = "承受傷害"
+	end_turn_btn.visible = true
+	_refresh_hand()  # Refresh so player can click 閃 cards
+
+
+func _on_dodge_resolved() -> void:
+	## Player responded to enemy attack — reset mode.
+	dodge_response_active = false
+	end_turn_btn.text = "結束回合"
+	end_turn_btn.visible = false
+	_refresh_ui()
 
 
 func _start_battle() -> void:
