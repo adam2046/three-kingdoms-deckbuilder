@@ -736,17 +736,30 @@ func _refresh_skill_button() -> void:
 	if battle_manager.current_phase == BattleManager.Phase.PLAY:
 		skill_btn.visible = battle_manager._has_active_skill()
 		if skill_btn.visible:
-			match battle_manager.player_hero.id:
-				"sun_quan":
-					skill_btn.text = "制衡"
+			skill_btn.text = _get_skill_label(battle_manager.player_hero.id)
 	else:
 		skill_btn.visible = false
 
 
+func _get_skill_label(hero_id: String) -> String:
+	## Return the Chinese skill name for the hero's active skill button.
+	match hero_id:
+		"sun_quan": return "制衡"
+		"huang_gai": return "苦肉"
+		"liu_bei": return "仁德"
+		"zhou_yu": return "反間"
+		"lv_meng": return "克己"
+		"gan_ning": return "奇襲"
+		"xu_chu": return "裸衣"
+		"zhang_jiao": return "雷擊"
+		"zhuge_liang": return "觀星"
+		_: return "技能"
+
+
 func _on_skill_pressed() -> void:
-	match battle_manager.player_hero.id:
-		"sun_quan":
-			battle_manager._activate_skill("zhiheng")
+	var skill_name := battle_manager._get_active_skill_name()
+	if skill_name != "":
+		battle_manager._activate_skill(skill_name)
 	_refresh_ui()
 
 
