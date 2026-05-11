@@ -1,2 +1,3 @@
 res://scripts/battle/battle_scene.gd
 res://scripts/battle/card_node.gd
+res://scripts/data/player_data.gd

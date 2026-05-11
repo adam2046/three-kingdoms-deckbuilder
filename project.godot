@@ -21,6 +21,7 @@ config/icon="res://icon.svg"
 
 PlayerData="*res://scripts/data/player_data.gd"
 MetaData="*res://scripts/data/meta_data.gd"
+CardLibrary="*res://scripts/data/card_library.gd"
 
 [display]
 

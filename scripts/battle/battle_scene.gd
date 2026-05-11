@@ -244,19 +244,25 @@ func _load_test_hero(hero_id: String = "zhao_yun") -> void:
 
 
 func _create_starter_deck_balanced() -> Array[CardData]:
+	## Balanced starter: uses CardLibrary for consistent card data.
 	var deck: Array[CardData] = []
 	var card_ids := [
-		"slash_spade_7", "slash_heart_10", "slash_club_4", "slash_diamond_8",
-		"dodge_heart_2", "dodge_diamond_6", "dodge_diamond_J",
-		"peach_heart_4", "wine_spade_3",
-		"dismantle_spade_3", "steal_spade_4", "draw2_club_7",
-		"duel_spade_A", "barbarian_spade_7", "peach_garden_heart_A",
-		"negate_club_Q", "weapon_spade_A",
+		"slash_S_7", "slash_H_10", "slash_C_4", "slash_D_8",
+		"dodge_H_2", "dodge_D_6", "dodge_D_11",
+		"peach_H_4", "wine_S_3",
+		"dismantle_S_3", "steal_S_4", "draw2_H_7",
+		"duel_S_1", "barbarian_S_7", "peach_garden_H_1",
+		"negate_C_12", "weapon_H_5",
 	]
 	for cid in card_ids:
-		var card := _create_test_card(cid)
+		var card := CardLibrary.get_card(cid)
 		if card:
 			deck.append(card)
+		else:
+			# Fallback: create from old factory if library doesn't have the ID
+			card = _create_test_card(cid)
+			if card:
+				deck.append(card)
 	return deck
 
 
@@ -264,15 +270,19 @@ func _create_starter_deck_attack() -> Array[CardData]:
 	## Attack-type starter: 5 殺, 2 閃, 1 桃, 1 酒, 1 決鬥 = 10 cards
 	var deck: Array[CardData] = []
 	var card_ids := [
-		"slash_spade_7", "slash_heart_10", "slash_club_4", "slash_diamond_8", "slash_club_5",
-		"dodge_heart_2", "dodge_diamond_6",
-		"peach_heart_4", "wine_spade_3",
-		"duel_spade_A",
+		"slash_S_7", "slash_H_10", "slash_C_4", "slash_D_8", "slash_C_5",
+		"dodge_H_2", "dodge_D_6",
+		"peach_H_4", "wine_S_3",
+		"duel_S_1",
 	]
 	for cid in card_ids:
-		var card := _create_test_card(cid)
+		var card := CardLibrary.get_card(cid)
 		if card:
 			deck.append(card)
+		else:
+			card = _create_test_card(cid)
+			if card:
+				deck.append(card)
 	return deck
 
 
@@ -840,52 +850,8 @@ func _hide_card_rewards() -> void:
 
 
 func _generate_reward_cards(count: int) -> Array:
-	## Generate random cards for reward selection.
-	var pool: Array = []
-	
-	# Card templates for the reward pool
-	var templates := [
-		{"id": "slash_spade_A", "type": "slash", "suit": "spade", "num": "A"},
-		{"id": "slash_heart_K", "type": "slash", "suit": "heart", "num": "K"},
-		{"id": "slash_club_5", "type": "slash", "suit": "club", "num": "5"},
-		{"id": "slash_diamond_Q", "type": "slash", "suit": "diamond", "num": "Q"},
-		{"id": "dodge_heart_A", "type": "dodge", "suit": "heart", "num": "A"},
-		{"id": "dodge_diamond_K", "type": "dodge", "suit": "diamond", "num": "K"},
-		{"id": "dodge_diamond_3", "type": "dodge", "suit": "diamond", "num": "3"},
-		{"id": "peach_heart_Q", "type": "peach", "suit": "heart", "num": "Q"},
-		{"id": "peach_heart_3", "type": "peach", "suit": "heart", "num": "3"},
-		{"id": "wine_spade_9", "type": "wine", "suit": "spade", "num": "9"},
-		{"id": "wine_club_3", "type": "wine", "suit": "club", "num": "3"},
-		{"id": "dismantle_heart_3", "type": "dismantle", "suit": "heart", "num": "3"},
-		{"id": "dismantle_spade_Q", "type": "dismantle", "suit": "spade", "num": "Q"},
-		{"id": "steal_diamond_3", "type": "steal", "suit": "diamond", "num": "3"},
-		{"id": "steal_spade_J", "type": "steal", "suit": "spade", "num": "J"},
-		{"id": "draw2_club_8", "type": "draw2", "suit": "club", "num": "8"},
-		{"id": "draw2_club_J", "type": "draw2", "suit": "club", "num": "J"},
-		{"id": "duel_spade_A", "type": "duel", "suit": "spade", "num": "A"},
-		{"id": "duel_club_A", "type": "duel", "suit": "club", "num": "A"},
-		{"id": "barbarian_spade_K", "type": "barbarian", "suit": "spade", "num": "K"},
-		{"id": "barbarian_club_7", "type": "barbarian", "suit": "club", "num": "7"},
-		{"id": "volley_heart_A", "type": "volley", "suit": "heart", "num": "A"},
-		{"id": "peach_garden_heart_A", "type": "peach_garden", "suit": "heart", "num": "A"},
-		{"id": "harvest_heart_3", "type": "harvest", "suit": "heart", "num": "3"},
-		{"id": "harvest_heart_4", "type": "harvest", "suit": "heart", "num": "4"},
-		{"id": "negate_spade_J", "type": "negate", "suit": "spade", "num": "J"},
-		{"id": "negate_club_Q", "type": "negate", "suit": "club", "num": "Q"},
-		{"id": "negate_diamond_K", "type": "negate", "suit": "diamond", "num": "K"},
-		{"id": "weapon_spade_A", "type": "weapon", "suit": "spade", "num": "A"},
-		{"id": "armor_spade_2", "type": "armor", "suit": "spade", "num": "2"},
-		{"id": "crossbow_spade_A", "type": "crossbow", "suit": "spade", "num": "A"},
-	]
-	
-	templates.shuffle()
-	for i in range(min(count, templates.size())):
-		var tmpl = templates[i]
-		var card = _create_test_card(tmpl["id"])
-		if card:
-			pool.append(card)
-	
-	return pool
+	## Generate random cards for reward selection using the full 108-card library.
+	return CardLibrary.get_random_rewards(count)
 
 
 # ============================================================
