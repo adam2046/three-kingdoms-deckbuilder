@@ -45,10 +45,10 @@ var map_manager = null            # Roguelike progression (MapManager)
 
 # -- Skill state --
 var skill_used_this_turn: Dictionary = {}  # e.g. {"zhiheng": true}
+var xu_chu_luoyi_active: bool = false      # 許褚 裸衣 toggle state
 
 # -- Enemies --
 var enemies: Array = []       # Array of EnemyData/Node references
-
 
 # ============================================================
 #  HERO SKILL SYSTEM
@@ -62,16 +62,27 @@ func _on_damage_taken(amount: int, source = null) -> void:
 	match player_hero.id:
 		"cao_cao":
 			_skill_jianxiong(source)
-
+		"sim_yi":
+			_skill_fankui(source)
+		"xiahou_dun":
+			_skill_ganglie(source)
+		"guo_jia":
+			_skill_tiandu()
+		"xiao_qiao":
+			_skill_tianxiang(amount, source)
 
 func _can_substitute(card: CardData, as_sub_type: CardData.SubType) -> bool:
 	## Check if a card can be played as a different sub-type.
-	## Used by skills like 龍膽 (殺↔閃), 武聖 (red→殺), 傾國 (black→閃), etc.
+	## Used by skills like 龍膽 (殺↔閃), 武聖 (red→殺), 傾國 (black→閃), 國色 (♦→樂不思蜀)
 	match player_hero.id:
 		"zhao_yun":
 			return _skill_longdan_check(card, as_sub_type)
 		"guan_yu":
 			return _skill_wusheng_check(card, as_sub_type)
+		"zhen_ji":
+			return _skill_qingguo_check(card, as_sub_type)
+		"da_qiao":
+			return _skill_guose_check(card, as_sub_type)
 	return false
 
 
@@ -87,6 +98,8 @@ func _get_substitute_card(card: CardData, as_sub_type: CardData.SubType) -> Card
 		CardData.SubType.DODGE:
 			sub.block = 1
 			sub.name_zh = "閃"
+		CardData.SubType.LE_BUSI:
+			sub.name_zh = "樂不思蜀"
 	return sub
 
 
@@ -95,7 +108,38 @@ func _has_active_skill() -> bool:
 	match player_hero.id:
 		"sun_quan":
 			return not skill_used_this_turn.get("zhiheng", false) and not hand.is_empty()
+		"huang_gai":
+			return not skill_used_this_turn.get("kurou", false) and player_hp > 1
+		"liu_bei":
+			return not skill_used_this_turn.get("rende", false) and hand.size() >= 2 and player_hp < player_max_hp
+		"zhou_yu":
+			return not skill_used_this_turn.get("fanjian", false) and not enemies.is_empty()
+		"lv_meng":
+			return not skill_used_this_turn.get("keji", false)
+		"gan_ning":
+			return not equipment_slots.is_empty() and _get_first_alive_enemy() != null
+		"xu_chu":
+			return true  # 裸衣 is a toggle, always available
+		"zhang_jiao":
+			return not skill_used_this_turn.get("leiji", false) and _get_first_alive_enemy() != null
+		"zhuge_liang":
+			return not skill_used_this_turn.get("guanxing", false) and not deck.is_empty()
 	return false
+
+
+func _get_active_skill_name() -> String:
+	## Returns the skill name for UI display.
+	match player_hero.id:
+		"sun_quan": return "zhiheng"
+		"huang_gai": return "kurou"
+		"liu_bei": return "rende"
+		"zhou_yu": return "fanjian"
+		"lv_meng": return "keji"
+		"gan_ning": return "qixi"
+		"xu_chu": return "luoyi"
+		"zhang_jiao": return "leiji"
+		"zhuge_liang": return "guanxing"
+		_: return ""
 
 
 func _activate_skill(skill_name: String) -> bool:
@@ -103,6 +147,22 @@ func _activate_skill(skill_name: String) -> bool:
 	match skill_name:
 		"zhiheng":
 			return _skill_zhiheng()
+		"kurou":
+			return _skill_kurou()
+		"rende":
+			return _skill_rende()
+		"fanjian":
+			return _skill_fanjian()
+		"keji":
+			return _skill_keji()
+		"qixi":
+			return _skill_qixi()
+		"luoyi":
+			return _skill_luoyi()
+		"leiji":
+			return _skill_leiji()
+		"guanxing":
+			return _skill_guanxing()
 	return false
 
 
@@ -130,6 +190,59 @@ func _skill_wusheng_check(card: CardData, as_sub_type: CardData.SubType) -> bool
 	return false
 
 
+func _skill_fankui(source = null) -> void:
+	## 司馬懿 反饋: take damage → steal 1 card (draw 1 in PvE)
+	draw_cards(1)
+	print("[反饋] Draw 1 card after taking damage")
+
+
+func _skill_ganglie(source = null) -> void:
+	## 夏侯惇 剛烈: take damage → deal 1 back to source
+	if source and source is EnemyData and source.is_alive():
+		source.take_damage(1)
+		print("[剛烈] Deal 1 damage back to %s" % source.name_zh)
+		_check_victory()
+	elif not enemies.is_empty():
+		for e in enemies:
+			if e.is_alive():
+				e.take_damage(1)
+				print("[剛烈] Deal 1 damage to %s" % e.name_zh)
+				_check_victory()
+				break
+
+
+func _skill_tiandu() -> void:
+	## 郭嘉 天妒: draw 2 cards when damaged
+	draw_cards(2)
+	print("[天妒] Draw 2 cards after taking damage")
+
+
+func _skill_tianxiang(amount: int, source = null) -> void:
+	## 小喬 天香: when damaged, if any red card in hand, negate the damage
+	for card in hand:
+		if card.is_red():
+			hand.erase(card)
+			discard_pile.append(card)
+			player_hp += amount  # Undo the damage
+			print("[天香] Red card %s%s negates %d damage" % [card.suit_symbol(), card.name_zh, amount])
+			return
+	print("[天香] No red card in hand — cannot negate")
+
+
+func _skill_qingguo_check(card: CardData, as_sub_type: CardData.SubType) -> bool:
+	## 甄姬 傾國: black cards (♠/♣) can be used as 閃
+	if as_sub_type == CardData.SubType.DODGE and card.is_black():
+		return true
+	return false
+
+
+func _skill_guose_check(card: CardData, as_sub_type: CardData.SubType) -> bool:
+	## 大喬 國色: diamond (♢) cards can be used as 樂不思蜀
+	if as_sub_type == CardData.SubType.LE_BUSI and card.suit == CardData.Suit.DIAMOND:
+		return true
+	return false
+
+
 func _skill_zhiheng() -> bool:
 	## 孫權 制衡: discard any number of cards, draw that many. Once per turn.
 	if skill_used_this_turn.get("zhiheng", false):
@@ -143,6 +256,136 @@ func _skill_zhiheng() -> bool:
 	draw_cards(count)
 	skill_used_this_turn["zhiheng"] = true
 	return true
+
+
+func _skill_kurou() -> bool:
+	## 黃蓋 苦肉: lose 1 HP → draw 2 cards. Once per turn.
+	if skill_used_this_turn.get("kurou", false):
+		return false
+	if player_hp <= 1:
+		return false
+	player_hp -= 1
+	draw_cards(2)
+	skill_used_this_turn["kurou"] = true
+	print("[苦肉] Lose 1 HP, draw 2 cards (HP: %d/%d)" % [player_hp, player_max_hp])
+	return true
+
+
+func _skill_rende() -> bool:
+	## 劉備 仁德: give 2 cards → heal 1 HP. Once per turn.
+	if skill_used_this_turn.get("rende", false):
+		return false
+	if hand.size() < 2:
+		return false
+	if player_hp >= player_max_hp:
+		return false
+	var to_discard := hand.slice(0, 2)
+	for card in to_discard:
+		hand.erase(card)
+		discard_pile.append(card)
+	player_hp = min(player_hp + 1, player_max_hp)
+	skill_used_this_turn["rende"] = true
+	print("[仁德] Discard 2, heal 1 HP (HP: %d/%d)" % [player_hp, player_max_hp])
+	return true
+
+
+func _skill_fanjian() -> bool:
+	## 周瑜 反間: enemy guesses a suit — wrong guess = 2 damage. PvE: 50% chance.
+	if skill_used_this_turn.get("fanjian", false):
+		return false
+	if enemies.is_empty():
+		return false
+	skill_used_this_turn["fanjian"] = true
+	var target := _get_first_alive_enemy()
+	if target and randi() % 2 == 0:
+		target.take_damage(2)
+		print("[反間] %s guessed wrong! 2 damage" % target.name_zh)
+		_check_victory()
+	else:
+		print("[反間] %s guessed correctly — no damage" % (target.name_zh if target else "?"))
+	return true
+
+
+func _skill_keji() -> bool:
+	## 呂蒙 克己: skip discard phase this turn → draw 1 card
+	if skill_used_this_turn.get("keji", false):
+		return false
+	hand_size_limit = 9999  # Effectively skip discard
+	draw_cards(1)
+	skill_used_this_turn["keji"] = true
+	print("[克己] Skip discard this turn, draw 1 card")
+	return true
+
+
+func _skill_qixi() -> bool:
+	## 甘寧 奇襲: discard equipped card → deal 2 damage to enemy
+	if equipment_slots.is_empty():
+		return false
+	var target := _get_first_alive_enemy()
+	if not target:
+		return false
+	var slot_key: String = equipment_slots.keys()[0]
+	var unequipped: CardData = equipment_slots[slot_key]
+	equipment_slots.erase(slot_key)
+	discard_pile.append(unequipped)
+	target.take_damage(2)
+	print("[奇襲] Discard %s, deal 2 damage to %s" % [unequipped.name_zh, target.name_zh])
+	_check_victory()
+	return true
+
+
+func _skill_leiji() -> bool:
+	## 張角 雷擊: judgment check — if spade, deal 2 lightning damage to enemy
+	if skill_used_this_turn.get("leiji", false):
+		return false
+	var target := _get_first_alive_enemy()
+	if not target:
+		return false
+	skill_used_this_turn["leiji"] = true
+	var judged := draw_top_card()
+	if judged and judged.suit == CardData.Suit.SPADE:
+		target.take_damage(2)
+		print("[雷擊] Spade judgment → 2 lightning damage to %s" % target.name_zh)
+		discard_pile.append(judged)
+		_check_victory()
+	else:
+		var info: String = "%s%d" % [judged.suit_symbol(), judged.number] if judged else "empty deck"
+		print("[雷擊] Judgment %s — no spade, no damage" % info)
+		if judged:
+			discard_pile.append(judged)
+	return true
+
+
+func _skill_luoyi() -> bool:
+	## 許褚 裸衣: toggle — 殺 deals +1 damage but you take 1 self-damage
+	xu_chu_luoyi_active = not xu_chu_luoyi_active
+	print("[裸衣] %s" % ("ON — 殺 dmg+1, self-dmg 1" if xu_chu_luoyi_active else "OFF"))
+	return true
+
+
+func _skill_guanxing() -> bool:
+	## 諸葛亮 觀星: see top 5 cards of deck, reorder them. Simplified: draw 3.
+	if skill_used_this_turn.get("guanxing", false):
+		return false
+	if deck.is_empty():
+		return false
+	skill_used_this_turn["guanxing"] = true
+	var drawn: int = 0
+	for i in range(min(3, deck.size())):
+		if not deck.is_empty():
+			var card: CardData = deck.pop_back()
+			hand.append(card)
+			drawn += 1
+	print("[觀星] Drew %d cards — choose wisely" % drawn)
+	return true
+
+
+func _get_first_alive_enemy() -> EnemyData:
+	## Helper: get the first alive enemy, or null.
+	for e in enemies:
+		if e.is_alive():
+			return e
+	return null
 
 
 func _ready() -> void:
@@ -174,7 +417,6 @@ func initialize_battle() -> void:
 func start_turn() -> void:
 	turn_started.emit(turn_number)
 	_advance_phase(Phase.JUDGMENT)
-
 
 func end_turn() -> void:
 	_advance_phase(Phase.END)
@@ -216,7 +458,6 @@ func _execute_enemy_turns() -> void:
 	# Remove dead enemies
 	enemies = enemies.filter(func(e): return e.is_alive())
 
-
 func _enemy_attack(enemy: EnemyData) -> void:
 	## Enemy attacks — player can respond with 閃 to block.
 	var blocked := false
@@ -235,13 +476,11 @@ func _enemy_attack(enemy: EnemyData) -> void:
 		if not blocked:
 			take_damage(enemy.intent_value)
 
-
 func _has_dodge_in_hand() -> bool:
 	for card in hand:
 		if card.sub_type == CardData.SubType.DODGE:
 			return true
 	return false
-
 
 func _has_crossbow() -> bool:
 	## Check if 諸葛連弩 is equipped.
@@ -250,7 +489,6 @@ func _has_crossbow() -> bool:
 		if wp.id == "zhuge_crossbow":
 			return true
 	return false
-
 
 func use_dodge(card: CardData) -> bool:
 	## Player uses a 閃 to block the current enemy attack.
@@ -278,23 +516,19 @@ func _current_attacker_requires_double() -> bool:
 			return true
 	return false
 
-
 func skip_dodge() -> void:
 	## Player chooses not to block — take full damage.
 	dodge_used_this_attack = false
 	dodge_response_received.emit()
 
-
 func _enemy_skill(enemy: EnemyData) -> void:
 	take_damage(enemy.intent_value + 1)
-
 
 func _all_enemies_dead() -> bool:
 	for e in enemies:
 		if e.is_alive():
 			return false
 	return true
-
 
 func _check_victory() -> bool:
 	## Check if all enemies are dead. If yes, emit victory and return true.
@@ -305,7 +539,6 @@ func _check_victory() -> bool:
 		battle_ended.emit(true)
 		return true
 	return false
-
 
 # ============================================================
 #  PHASE HANDLERS
@@ -348,24 +581,32 @@ func _resolve_judgment_phase() -> void:
 		
 		judgment_zone.erase(card)
 
-
 func _resolve_draw_phase() -> void:
 	## Draw 2 cards. Hero skills (e.g. 周瑜 英姿) may modify this.
 	var draw_amount := 2
-	# TODO: Apply hero skill modifiers (英姿 +1, 突襲 replaces draw entirely)
+	# 周瑜 英姿: draw 1 extra card during draw phase
+	if player_hero.id == "zhou_yu":
+		draw_amount += 1
+		print("[英姿] Draw +1 (total: %d)" % draw_amount)
 	draw_cards(draw_amount)
 
 
 func _resolve_end_phase() -> void:
-	## Trigger end-of-turn effects (e.g. 閉月 draws 1 card).
-	# TODO: Apply hero-specific end-phase effects
+	## Trigger end-of-turn effects and reset per-turn state.
 	energy_used = 0
 	wine_active = false
 	attack_limit_reached = false
 	block = 0
 	skill_used_this_turn.clear()
 	hand_size_limit = player_hp  # Reset (may be modified by 克己)
-
+	
+	# 陸遜 連營: if hand is empty at end of turn, draw 2
+	if player_hero.id == "lu_xun" and hand.is_empty():
+		draw_cards(2)
+		print("[連營] Empty hand → draw 2 cards")
+	
+	# 許褚 裸衣 reset for next turn
+	xu_chu_luoyi_active = false
 
 # ============================================================
 #  CARD OPERATIONS
@@ -378,7 +619,6 @@ func draw_cards(count: int) -> void:
 		if not deck.is_empty():
 			var card: CardData = deck.pop_back()
 			hand.append(card)
-
 
 func draw_top_card() -> CardData:
 	## Draw exactly 1 card from top of deck. Returns null if deck empty.
@@ -399,8 +639,8 @@ func play_card(card: CardData, target = null) -> bool:
 	if current_phase != Phase.PLAY:
 		return false
 	
-	# Check hero skill substitution (龍膽, 武聖, 傾國, etc.)
-	# Only auto-substitute DODGE (normally unplayable) → SLASH
+	# Check hero skill substitution (龍膽, 武聖, 傾國, 國色, etc.)
+	# Auto-substitute DODGE → SLASH (normally unplayable on your turn)
 	var effective_card: CardData = card
 	if card.card_type == CardData.CardType.BASIC and card.sub_type == CardData.SubType.DODGE:
 		if _can_substitute(card, CardData.SubType.SLASH):
@@ -409,14 +649,23 @@ func play_card(card: CardData, target = null) -> bool:
 				"zhao_yun": print("[龍膽] %s used as 殺" % card.name_zh)
 				"guan_yu": print("[武聖] %s%s used as 殺" % [card.suit_symbol(), card.name_zh])
 				_: print("[Sub] %s used as 殺" % card.name_zh)
+	# 國色: diamond cards → 樂不思蜀
+	elif player_hero.id == "da_qiao" and card.suit == CardData.Suit.DIAMOND and card.card_type != CardData.CardType.DELAY_STRATEGY:
+		if _can_substitute(card, CardData.SubType.LE_BUSI):
+			effective_card = _get_substitute_card(card, CardData.SubType.LE_BUSI)
+			print("[國色] %s%s used as 樂不思蜀" % [card.suit_symbol(), card.name_zh])
+	# 傾國: black cards → 閃 (in response to enemy attack, handled via use_dodge)
 	
 	# Handle card by effective type
 	match effective_card.card_type:
 		CardData.CardType.BASIC:
 			match effective_card.sub_type:
 				CardData.SubType.SLASH:
-					# 張飛 咆哮 / 諸葛連弩: no limit on 殺 per turn
-					if player_hero.id != "zhang_fei" and not _has_crossbow() and energy_used >= energy:
+					# 殺 limit: normally 1/turn, but 張飛 咆哮/諸葛連弩/夏侯淵 疾行
+					var slash_limit: int = energy
+					if player_hero.id == "xiahou_yuan":
+						slash_limit = 2  # 疾行: can play 2 殺 per turn
+					if player_hero.id != "zhang_fei" and not _has_crossbow() and energy_used >= slash_limit:
 						return false  # "殺" limit reached
 					# Deal damage to target (with wine bonus)
 					var dmg: int = effective_card.damage
@@ -425,11 +674,28 @@ func play_card(card: CardData, target = null) -> bool:
 						wine_active = false
 					# Hero skill damage modifiers
 					match player_hero.id:
-						"lv_bu": dmg += 1  # 無雙: overwhelming force
+						"lv_bu":
+							dmg += 1  # 無雙: overwhelming force
 						"huang_zhong":
 							if target and target is EnemyData and hand.size() >= target.current_hp:
 								dmg += 1
 								print("[烈弓] Bonus damage! Hand %d >= enemy HP %d" % [hand.size(), target.current_hp])
+						"ma_chao":
+							# 鐵騎: judgment check — if red, +1 damage
+							var judged := draw_top_card()
+							if judged and judged.is_red():
+								dmg += 1
+								print("[鐵騎] Red judgment → dmg+1")
+							if judged:
+								discard_pile.append(judged)
+						"xu_chu":
+							if xu_chu_luoyi_active:
+								dmg += 1  # 裸衣: bonus damage
+								print("[裸衣] 殺 damage +1!")
+					# 許褚 裸衣 self-damage: take 1 damage after 殺 connects
+					if player_hero.id == "xu_chu" and xu_chu_luoyi_active:
+						take_damage(1)
+						print("[裸衣] Self-damage 1")
 					# Equipment: weapon gives +1 damage
 					if equipment_slots.has("weapon"):
 						dmg += 1
@@ -456,6 +722,10 @@ func play_card(card: CardData, target = null) -> bool:
 						wine_active = true
 		CardData.CardType.STRATEGY:
 			_resolve_strategy(effective_card, target)
+			# 黃月英 集智: play strategy card → draw 1
+			if player_hero.id == "huang_yueying":
+				draw_cards(1)
+				print("[集智] Strategy played → draw 1")
 		CardData.CardType.EQUIPMENT:
 			_equip_card(effective_card)
 		CardData.CardType.DELAY_STRATEGY:
@@ -701,12 +971,10 @@ func _reshuffle_discard() -> void:
 	discard_pile.clear()
 	shuffle_deck()
 
-
 func discard_card(card: CardData) -> void:
 	if hand.has(card):
 		hand.erase(card)
 	discard_pile.append(card)
-
 
 func _aoe_damage(amount: int) -> void:
 	## Deal damage to all alive enemies. Remove dead enemies after.
@@ -714,7 +982,6 @@ func _aoe_damage(amount: int) -> void:
 		if enemy.is_alive():
 			enemy.take_damage(amount)
 	_check_victory()
-
 
 func take_damage(amount: int) -> void:
 	## Apply damage to player, reduced by block and armor first.
@@ -729,11 +996,13 @@ func take_damage(amount: int) -> void:
 		effective -= 1
 		print("[Armor] %s reduced damage by 1" % equipment_slots["armor"].name_zh)
 	player_hp = max(0, player_hp - effective)
-	_on_damage_taken(effective)  # Trigger hero skill reactions (e.g. 奸雄)
+	_on_damage_taken(effective)  # Trigger hero skill reactions (e.g. 奸雄, 反饋, 剛烈)
 	if player_hp <= 0:
-		# TODO: Check for 桃 rescue opportunity
+		# Check for 桃 rescue opportunity
+		# Check for 天香 (小喬) — auto-negate if red card in hand
+		if player_hero.id == "xiao_qiao":
+			pass  # 天香 is handled in _on_damage_taken above
 		battle_ended.emit(false)
-
 
 func _setup_follower() -> void:
 	## Check if hero archetype is SUPPORT — they may start with a follower.

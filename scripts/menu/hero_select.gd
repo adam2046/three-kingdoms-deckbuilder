@@ -24,6 +24,13 @@ const HERO_DATA := {
 	"diao_chan": {"name": "貂蟬", "faction": "QUN", "hp": 3, "skill": "離間: force 2 enemies to duel", "archetype": "CONTROL"},
 	"huang_zhong": {"name": "黃忠", "faction": "SHU", "hp": 4, "skill": "烈弓: hand≥HP → 殺 dmg+1", "archetype": "ATTACK"},
 	"ma_chao": {"name": "馬超", "faction": "SHU", "hp": 4, "skill": "鐵騎: red judgment → dmg+1", "archetype": "ATTACK"},
+	"huang_yueying": {"name": "黃月英", "faction": "SHU", "hp": 3, "skill": "集智: play strategy → draw 1", "archetype": "CONTROL"},
+	"xiahou_yuan": {"name": "夏侯淵", "faction": "WEI", "hp": 4, "skill": "疾行: 2 殺/turn", "archetype": "ATTACK"},
+	"xu_chu": {"name": "許褚", "faction": "WEI", "hp": 4, "skill": "裸衣: 殺 dmg+1, self-dmg 1", "archetype": "ATTACK"},
+	"lv_meng": {"name": "呂蒙", "faction": "WU", "hp": 4, "skill": "克己: skip discard → draw 1", "archetype": "CONTROL"},
+	"gan_ning": {"name": "甘寧", "faction": "WU", "hp": 4, "skill": "奇襲: discard equip → deal 2 dmg", "archetype": "ATTACK"},
+	"xiao_qiao": {"name": "小喬", "faction": "WU", "hp": 3, "skill": "天香: red suit → negate dmg", "archetype": "SUPPORT"},
+	"zhang_jiao": {"name": "張角", "faction": "QUN", "hp": 3, "skill": "雷擊: spade judgment → 2 lightning dmg", "archetype": "CONTROL"},
 }
 
 var current_faction: String = "ALL"

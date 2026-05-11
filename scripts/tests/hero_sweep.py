@@ -31,13 +31,15 @@ TIMEOUT = 15  # seconds per hero
 ALL_HEROES = [
     # SHU
     "zhao_yun", "guan_yu", "zhang_fei", "zhuge_liang", "liu_bei",
-    "ma_chao", "huang_zhong",
+    "ma_chao", "huang_zhong", "huang_yueying",
     # WEI
     "cao_cao", "sim_yi", "xiahou_dun", "zhen_ji", "guo_jia",
+    "xiahou_yuan", "xu_chu",
     # WU
     "sun_quan", "zhou_yu", "lu_xun", "huang_gai", "da_qiao",
+    "lv_meng", "gan_ning", "xiao_qiao",
     # QUN
-    "lv_bu", "diao_chan",
+    "lv_bu", "diao_chan", "zhang_jiao",
 ]
 
 QUICK_HEROES = ["zhao_yun", "cao_cao", "sun_quan"]
