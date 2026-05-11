@@ -46,6 +46,7 @@ static func zone_1() -> ZoneDef:
 	var nodes: Array = []
 	nodes.append(NodeDef.new(NodeType.START, "起點", "Start"))
 	nodes.append(NodeDef.new(NodeType.BATTLE, "遭遇戰", "Skirmish", ["yellow_turban_soldier"]))
+	nodes.append(NodeDef.new(NodeType.BATTLE, "伏擊", "Ambush", ["yellow_turban_soldier", "yellow_turban_crossbow"]))
 	nodes.append(NodeDef.new(NodeType.SHOP, "商店", "Shop"))
 	nodes.append(NodeDef.new(NodeType.CAMPFIRE, "營火", "Campfire"))
 	nodes.append(NodeDef.new(NodeType.ELITE, "黃巾精銳", "Elite Guard", ["yellow_turban_elite"]))
@@ -58,7 +59,8 @@ static func zone_1() -> ZoneDef:
 static func zone_2() -> ZoneDef:
 	var nodes: Array = []
 	nodes.append(NodeDef.new(NodeType.START, "虎牢關", "Hu Lao Gate"))
-	nodes.append(NodeDef.new(NodeType.BATTLE, "遭遇戰", "Skirmish", ["dong_zhuo_soldier"]))
+	nodes.append(NodeDef.new(NodeType.BATTLE, "遭遇戰", "Skirmish", ["dong_zhuo_soldier", "dong_zhuo_crossbow"]))
+	nodes.append(NodeDef.new(NodeType.BATTLE, "伏兵", "Ambush", ["road_bandit", "dong_zhuo_soldier"]))
 	nodes.append(NodeDef.new(NodeType.SHOP, "商店", "Shop"))
 	nodes.append(NodeDef.new(NodeType.CAMPFIRE, "營火", "Campfire"))
 	nodes.append(NodeDef.new(NodeType.ELITE, "虎牢守將", "Hu Lao Guardian", ["hu_lao_guard"]))
@@ -67,9 +69,24 @@ static func zone_2() -> ZoneDef:
 	return ZoneDef.new("zone_2", "虎牢關", "Hu Lao Gate", nodes, "lv_bu")
 
 
+## Zone 3: 赤壁之戰 (Battle of Red Cliffs)
+static func zone_3() -> ZoneDef:
+	var nodes: Array = []
+	nodes.append(NodeDef.new(NodeType.START, "赤壁", "Red Cliffs"))
+	nodes.append(NodeDef.new(NodeType.BATTLE, "遭遇戰", "Naval Skirmish", ["cao_navy_soldier", "cao_navy_archer"]))
+	nodes.append(NodeDef.new(NodeType.BATTLE, "水戰", "Naval Battle", ["cao_navy_soldier", "cao_strategist"]))
+	nodes.append(NodeDef.new(NodeType.ELITE, "蔡瑁", "Cai Mao", ["cai_mao"]))
+	nodes.append(NodeDef.new(NodeType.SHOP, "商店", "Shop"))
+	nodes.append(NodeDef.new(NodeType.CAMPFIRE, "營火", "Campfire"))
+	nodes.append(NodeDef.new(NodeType.BATTLE, "鐵索連環", "Iron Chain", ["cao_iron_guard", "cao_navy_archer"]))
+	nodes.append(NodeDef.new(NodeType.EVENT, "事件", "Event"))
+	nodes.append(NodeDef.new(NodeType.BOSS, "曹操", "Cao Cao", ["cao_cao_boss"]))
+	return ZoneDef.new("zone_3", "赤壁之戰", "Battle of Red Cliffs", nodes, "cao_cao_boss")
+
+
 ## All zones in order
 static func all_zones() -> Array[ZoneDef]:
-	return [zone_1(), zone_2()]
+	return [zone_1(), zone_2(), zone_3()]
 
 
 ## Get a zone by index

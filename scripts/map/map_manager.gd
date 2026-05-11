@@ -97,6 +97,12 @@ func _create_enemy_for_id(enemy_id: String):  # Returns EnemyData
             enemy.name_en = "Yellow Turban Soldier"
             enemy.max_hp = 5
             enemy.intent_pattern = [0, 0, 2]  # ATTACK, ATTACK, DEFEND
+        "yellow_turban_crossbow":
+            enemy.id = "yellow_turban_crossbow"
+            enemy.name_zh = "黃巾弓手"
+            enemy.name_en = "Yellow Turban Crossbow"
+            enemy.max_hp = 4
+            enemy.intent_pattern = [0, 2, 0]  # ATTACK, DEFEND, ATTACK
         "yellow_turban_elite":
             enemy.id = "yellow_turban_elite"
             enemy.name_zh = "黃巾精銳"
@@ -128,6 +134,56 @@ func _create_enemy_for_id(enemy_id: String):  # Returns EnemyData
             enemy.max_hp = 18
             enemy.intent_pattern = [0, 0, 3, 0, 2]  # ATTACK, ATTACK, SKILL, ATTACK, BUFF
             enemy.requires_double_dodge = true
+        # --- Zone 2 new enemies ---
+        "dong_zhuo_crossbow":
+            enemy.id = "dong_zhuo_crossbow"
+            enemy.name_zh = "董卓弓手"
+            enemy.name_en = "Dong Zhuo Crossbow"
+            enemy.max_hp = 4
+            enemy.intent_pattern = [0, 0, 2]  # ATTACK, ATTACK, DEFEND — fragile but aggressive
+        "road_bandit":
+            enemy.id = "road_bandit"
+            enemy.name_zh = "路盜"
+            enemy.name_en = "Road Bandit"
+            enemy.max_hp = 5
+            enemy.intent_pattern = [0, 2, 0]  # ATTACK, DEFEND, ATTACK
+        # --- Zone 3: 赤壁之戰 ---
+        "cao_navy_soldier":
+            enemy.id = "cao_navy_soldier"
+            enemy.name_zh = "曹軍水兵"
+            enemy.name_en = "Cao Navy Soldier"
+            enemy.max_hp = 6
+            enemy.intent_pattern = [0, 0, 2]  # ATTACK, ATTACK, DEFEND
+        "cao_navy_archer":
+            enemy.id = "cao_navy_archer"
+            enemy.name_zh = "曹軍弓手"
+            enemy.name_en = "Cao Navy Archer"
+            enemy.max_hp = 5
+            enemy.intent_pattern = [0, 2, 0]  # ATTACK, DEFEND, ATTACK — medium damage
+        "cao_strategist":
+            enemy.id = "cao_strategist"
+            enemy.name_zh = "曹軍謀士"
+            enemy.name_en = "Cao Strategist"
+            enemy.max_hp = 4
+            enemy.intent_pattern = [3, 2, 0]  # SKILL, DEFEND, ATTACK — skill first
+        "cao_iron_guard":
+            enemy.id = "cao_iron_guard"
+            enemy.name_zh = "鐵索衛"
+            enemy.name_en = "Iron Chain Guard"
+            enemy.max_hp = 10
+            enemy.intent_pattern = [2, 0, 0, 3]  # DEFEND, ATTACK, ATTACK, SKILL — tanky
+        "cai_mao":
+            enemy.id = "cai_mao"
+            enemy.name_zh = "蔡瑁"
+            enemy.name_en = "Cai Mao"
+            enemy.max_hp = 12
+            enemy.intent_pattern = [0, 3, 2, 0]  # ATTACK, SKILL, DEFEND, ATTACK — elite admiral
+        "cao_cao_boss":
+            enemy.id = "cao_cao_boss"
+            enemy.name_zh = "曹操"
+            enemy.name_en = "Cao Cao (Boss)"
+            enemy.max_hp = 25
+            enemy.intent_pattern = [0, 0, 3, 2, 0, 3]  # ATTACK, ATTACK, SKILL, DEFEND, ATTACK, SKILL
         _:
             enemy.id = enemy_id
             enemy.name_zh = "敵兵"
@@ -149,10 +205,26 @@ func _get_intent_value(intent: int, enemy_id: String) -> int:
             return 3 if intent == 0 else (2 if intent == 3 else 1)  # ATTACK=0, SKILL=3
         "dong_zhuo_soldier":
             return 2 if intent == 0 else 1
+        "dong_zhuo_crossbow":
+            return 2 if intent == 0 else 1
+        "road_bandit":
+            return 2 if intent == 0 else 1
         "hu_lao_guard":
             return 3 if intent == 0 else (2 if intent == 3 else 1)
         "lv_bu":
             return 2 if intent == 0 else (3 if intent == 3 else 2)
+        "cao_navy_soldier":
+            return 2 if intent == 0 else 1
+        "cao_navy_archer":
+            return 2 if intent == 0 else 1
+        "cao_strategist":
+            return 1 if intent == 0 else (2 if intent == 3 else 1)
+        "cao_iron_guard":
+            return 2 if intent == 0 else (2 if intent == 3 else 1)
+        "cai_mao":
+            return 2 if intent == 0 else (3 if intent == 3 else 1)
+        "cao_cao_boss":
+            return 3 if intent == 0 else (3 if intent == 3 else 2)
         _:
             return 1
 
