@@ -24,9 +24,14 @@ class_name BattleScene
 @onready var reward_overlay: Control = $UI/RewardOverlay
 @onready var reward_container: HBoxContainer = $UI/RewardOverlay/RewardContainer
 @onready var reward_title: Label = $UI/RewardOverlay/RewardTitle
+@onready var defeat_overlay: Control = $UI/DefeatOverlay
+@onready var defeat_stats: Label = $UI/DefeatOverlay/DefeatStats
+@onready var menu_btn: Button = $UI/DefeatOverlay/MenuBtn
 
 var reward_active: bool = false  # Blocks battle interaction while choosing reward
 var dodge_response_active: bool = false  # Blocks normal play during enemy attack response
+var dodge_count_needed: int = 1
+var dodge_count_played: int = 0
 
 
 func _ready() -> void:
@@ -40,16 +45,30 @@ func _ready() -> void:
 	skill_btn.pressed.connect(_on_skill_pressed)
 	skill_btn.visible = false
 	
+	# Semi-transparent background ensures RewardOverlay receives/block clicks properly
+	# (fully transparent Controls may not participate in input routing)
+	var reward_bg := ColorRect.new()
+	reward_bg.color = Color(0.1, 0.1, 0.15, 0.85)
+	reward_bg.anchors_preset = Control.PRESET_FULL_RECT
+	reward_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	reward_overlay.add_child(reward_bg)
+	# Move background to the back so cards are on top
+	reward_overlay.move_child(reward_bg, 0)
+
 	# Set up roguelike progression
 	battle_manager.map_manager = map_manager
 	map_manager.node_changed.connect(_on_node_changed)
 	map_manager.gold_changed.connect(_on_gold_changed)
+	menu_btn.pressed.connect(_on_return_to_menu)
 	
 	# Load test hero BEFORE starting run (run triggers first battle)
 	_load_test_hero(PlayerData.chosen_hero_id)  # Hero chosen on select screen
 	
 	# Now start the roguelike run — triggers _on_node_changed → _start_battle
 	map_manager.start_run()
+
+
+
 
 
 func _load_test_hero(hero_id: String = "zhao_yun") -> void:
@@ -515,25 +534,49 @@ func _card_needs_target(card: CardData) -> bool:
 func _on_card_played(card: CardData) -> void:
 	## Player clicks a card. If needs target, select and wait for enemy click.
 	## If no target (peach, draw2), play immediately.
-	
+	## Clicking the same selected card again cancels the selection.
+
 	# During dodge response: only 閃 is playable
 	if dodge_response_active:
 		if card.sub_type == CardData.SubType.DODGE:
+			dodge_count_played += 1
 			battle_manager.use_dodge(card)
 			_refresh_hand()
+			if dodge_count_played >= dodge_count_needed:
+				battle_manager.resolve_dodge()
+			else:
+				phase_label.text = "還需要 %d 張閃..." % (dodge_count_needed - dodge_count_played)
 		return
-	
+
 	if reward_active or shop_active or battle_manager.current_phase != BattleManager.Phase.PLAY:
 		return
-	
+
+	# If clicking the same card that's already selected — cancel selection
+	if selected_card == card:
+		print("[UI] Canceling card selection")
+		selected_card = null
+		for child in hand_container.get_children():
+			if child is CardNode:
+				child.highlight(false)
+		return
+
+	# If clicking a different card while one is selected — cancel previous selection first
+	if selected_card != null:
+		print("[UI] Previous selection canceled — choosing new card")
+		selected_card = null
+		for child in hand_container.get_children():
+			if child is CardNode:
+				child.highlight(false)
+
 	var needs_target := _card_needs_target(card)
-	
+
 	if needs_target:
 		# Block selection if 殺 limit reached (unless 張飛 咆哮 or 諸葛連弩)
 		if card.sub_type == CardData.SubType.SLASH and battle_manager.player_hero.id != "zhang_fei" and not battle_manager._has_crossbow() and battle_manager.energy_used >= battle_manager.energy:
 			print("[Blocked] 殺 limit reached (%d/%d)" % [battle_manager.energy_used, battle_manager.energy])
 			return
 		selected_card = card
+		print("[UI] Selected card for targeting: ", card.name_zh)
 		for child in hand_container.get_children():
 			if child is CardNode and child.card_data == card:
 				child.highlight(true)
@@ -597,16 +640,32 @@ func _auto_discard() -> void:
 func _on_battle_ended(victory: bool) -> void:
 	if victory:
 		print("VICTORY! Gold: %d" % map_manager.get_gold())
+		# Record run as victory for meta-progression
+		MetaData.record_run(true, map_manager.run_data.current_zone + 1)
+		MetaData.save()
+		print("Run recorded: %d wins / %d runs, %d spirit points" % [MetaData.total_wins, MetaData.total_runs, MetaData.spirit_points])
 		_show_card_rewards()
 	else:
 		print("DEFEAT... Run over.")
-		# TODO: Show defeat screen, offer restart
+		# Record run result for meta-progression
+		MetaData.record_run(false, map_manager.run_data.current_zone + 1)
+		var zone_name: String = map_manager.get_current_zone().name_zh if map_manager.get_current_zone() else "?"
+		defeat_stats.text = "%s\n獲得 %d 靈" % [zone_name, MetaData.spirit_points]
+		defeat_overlay.visible = true
+		end_turn_btn.visible = false
+		skill_btn.visible = false
+
+
+func _on_return_to_menu() -> void:
+	get_tree().change_scene_to_file("res://scenes/menu/main_menu.tscn")
 
 
 func _on_awaiting_dodge(enemy_name: String, damage: int) -> void:
 	## Enemy is attacking — enable dodge response mode.
 	dodge_response_active = true
-	phase_label.text = "%s 攻擊! 傷害 %d — 出閃?" % [enemy_name, damage]
+	dodge_count_played = 0
+	dodge_count_needed = 2 if battle_manager._current_attacker_requires_double() else 1
+	phase_label.text = "%s 攻擊! 傷害 %d — 出閃? (%d/%d)" % [enemy_name, damage, dodge_count_played, dodge_count_needed]
 	end_turn_btn.text = "承受傷害"
 	end_turn_btn.visible = true
 	_refresh_hand()  # Refresh so player can click 閃 cards
@@ -616,7 +675,12 @@ func _on_dodge_resolved() -> void:
 	## Player responded to enemy attack — reset mode.
 	dodge_response_active = false
 	end_turn_btn.text = "結束回合"
-	end_turn_btn.visible = false
+	# Don't force visible=false — let _on_phase_changed decide based on current phase
+	# Instead, sync with current phase immediately
+	if battle_manager.current_phase == BattleManager.Phase.PLAY:
+		end_turn_btn.visible = true
+	else:
+		end_turn_btn.visible = false
 	_refresh_ui()
 
 
@@ -676,6 +740,28 @@ func _on_skill_pressed() -> void:
 	_refresh_ui()
 
 
+var map_screen: Control = null
+
+func _show_map_screen() -> void:
+	## Show map screen overlay, wait for player to press Continue.
+	map_screen = load("res://scenes/map/map_screen.tscn").instantiate()
+	add_child(map_screen)
+	# Wait one frame for @onready vars to initialize
+	await get_tree().process_frame
+	map_screen.show_map(map_manager)
+	map_screen.continue_pressed.connect(_on_map_continue)
+	# Hide battle controls
+	end_turn_btn.visible = false
+	skill_btn.visible = false
+
+func _on_map_continue() -> void:
+	## Player pressed Continue on map screen — advance to next node.
+	if map_screen:
+		map_screen.queue_free()
+		map_screen = null
+	map_manager.advance_to_next_node()
+
+
 # ============================================================
 #  CARD REWARD SYSTEM
 # ============================================================
@@ -683,27 +769,48 @@ func _on_skill_pressed() -> void:
 var _reward_cards: Array = []  # Current reward card choices
 
 
+
+
+
 func _show_card_rewards() -> void:
 	## Display 3 card choices after battle victory.
+
+	# RE-ENTRANCY GUARD
+	if reward_active:
+		return
+
+	# ========================================
+	# CRITICAL: RESET mouse_filter FIRST
+	# PASS (1) = default for HBoxContainer = SILENTLY DROPS CLICKS
+	# ========================================
+	reward_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	reward_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	reward_active = true
 	_reward_cards = _generate_reward_cards(3)
-	
-	# Clear previous reward cards
+
+	# Clear previous reward cards — remove_child FIRST, then queue_free
 	for child in reward_container.get_children():
+		reward_container.remove_child(child)
 		child.queue_free()
-	
+
 	# Show the overlay
 	reward_overlay.visible = true
 	reward_title.text = "選擇獎勵卡牌"
-	
-	# Create CardNode for each reward
+
+	# Create CardNode for each reward — wrapped in VBoxContainer (same pattern as shop)
 	for card in _reward_cards:
+		var vbox := VBoxContainer.new()
+		# CRITICAL: VBoxContainer DEFAULT = PASS (1), which SILENTLY DROPS click events
+		vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var card_node = CardNode.new()
 		card_node.setup(card)
 		card_node.card_clicked.connect(_on_reward_card_selected)
-		reward_container.add_child(card_node)
-	
-	# Hide battle UI elements
+		vbox.add_child(card_node)
+		reward_container.add_child(vbox)
+
+# Hide battle UI (and EnemyArea — overlaps overlay card positions)
+	$EnemyArea.visible = false
 	end_turn_btn.visible = false
 	skill_btn.visible = false
 
@@ -711,7 +818,6 @@ func _show_card_rewards() -> void:
 func _on_reward_card_selected(card: CardData) -> void:
 	## Player clicked a reward card — add it to the deck and advance.
 	battle_manager.deck.append(card)
-	print("[Reward] Added %s to deck" % card.name_zh)
 	_hide_card_rewards()
 
 
@@ -719,13 +825,17 @@ func _hide_card_rewards() -> void:
 	## Hide reward overlay and advance to next map node.
 	reward_overlay.visible = false
 	reward_active = false
-	
-	# Clear reward cards
+
+	# Restore EnemyArea visibility
+	$EnemyArea.visible = true
+
+	# Clear reward cards — remove_child FIRST, then queue_free
 	for child in reward_container.get_children():
+		reward_container.remove_child(child)
 		child.queue_free()
 	_reward_cards.clear()
-	
-	# Advance to next node
+
+	# Advance to next map node
 	map_manager.advance_to_next_node()
 
 
@@ -788,34 +898,53 @@ var shop_active: bool = false
 
 func _show_shop() -> void:
 	## Display shop with 3 cards for purchase.
+
+	# RE-ENTRANCY GUARD
+	if shop_active:
+		return
+
+	# ========================================
+	# CRITICAL: RESET mouse_filter FIRST, BEFORE ANY OTHER OPERATIONS
+	# ========================================
+	# The value 1 (PASS) is EXTREMELY DANGEROUS in Godot 4:
+	# - MouseMotion events ARE received (hover works)
+	# - MouseButton events are SILENTLY DROPPED (clicks don't work)
+	reward_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	reward_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	shop_active = true
 	_reward_cards = _generate_reward_cards(3)
-	
+
 	# Clear previous cards
+	# Use remove_child + queue_free. Do NOT use await - causes re-entrancy.
 	for child in reward_container.get_children():
+		reward_container.remove_child(child)  # Immediately detach
 		child.queue_free()
-	
+
 	# Show overlay with shop styling
 	reward_overlay.visible = true
 	reward_title.text = "商店 — 金幣: %d  (每張 %d 金)" % [map_manager.get_gold(), SHOP_CARD_PRICE]
-	
+
 	# Create card nodes with price labels
 	for card in _reward_cards:
 		var vbox := VBoxContainer.new()
+		# CRITICAL: VBoxContainer DEFAULT = PASS (1), which SILENTLY DROPS click events
+		vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var card_node = CardNode.new()
 		card_node.setup(card)
 		card_node.card_clicked.connect(_on_shop_card_bought)
 		vbox.add_child(card_node)
-		
+
 		var price_label := Label.new()
 		price_label.text = "%d 金" % SHOP_CARD_PRICE
 		price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		price_label.add_theme_font_size_override("font_size", 16)
 		vbox.add_child(price_label)
-		
+
 		reward_container.add_child(vbox)
 	
-	# Hide battle UI
+	# Hide battle UI (and EnemyArea — same overlap issue as reward cards)
+	$EnemyArea.visible = false
 	end_turn_btn.visible = false
 	skill_btn.visible = false
 
@@ -843,11 +972,17 @@ func _hide_shop() -> void:
 	## Hide shop overlay and advance to next node.
 	reward_overlay.visible = false
 	shop_active = false
-	
+
+	# Restore EnemyArea visibility
+	$EnemyArea.visible = true
+
+	# Clear nodes - use remove_child FIRST, then queue_free
 	for child in reward_container.get_children():
+		reward_container.remove_child(child)
 		child.queue_free()
 	_reward_cards.clear()
-	
+
+	# Advance to next node
 	map_manager.advance_to_next_node()
 
 

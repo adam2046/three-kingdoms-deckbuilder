@@ -20,3 +20,6 @@ export_presets.cfg
 
 # macOS
 .DS_Store
+
+# Test artifacts
+test-results/

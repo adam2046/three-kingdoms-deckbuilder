@@ -15,7 +15,7 @@ enum Faction { WEI, SHU, WU, QUN }
 @export var faction: Faction
 
 # -- Archetype --
-enum Archetype { ATTACK, BALANCED, SUPPORT }
+enum Archetype { ATTACK, BALANCED, SUPPORT, CONTROL, DEFENSE }
 @export var archetype: Archetype = Archetype.BALANCED
 
 # -- Stats --
@@ -51,19 +51,21 @@ enum Archetype { ATTACK, BALANCED, SUPPORT }
 
 # -- Helpers --
 func faction_name_zh() -> String:
-    match faction:
-        Faction.WEI: return "魏"
-        Faction.SHU: return "蜀"
-        Faction.WU: return "吳"
-        Faction.QUN: return "群"
-    return "?"
+	match faction:
+		Faction.WEI: return "魏"
+		Faction.SHU: return "蜀"
+		Faction.WU: return "吳"
+		Faction.QUN: return "群"
+	return "?"
 
 func archetype_name_zh() -> String:
-    match archetype:
-        Archetype.ATTACK: return "攻擊型"
-        Archetype.BALANCED: return "均衡型"
-        Archetype.SUPPORT: return "支援型"
-    return "?"
+	match archetype:
+		Archetype.ATTACK: return "攻擊型"
+		Archetype.BALANCED: return "均衡型"
+		Archetype.SUPPORT: return "支援型"
+		Archetype.CONTROL: return "控制型"
+		Archetype.DEFENSE: return "防禦型"
+	return "?"
 
 func has_second_skill() -> bool:
-    return not skill_2_name_zh.is_empty()
+	return not skill_2_name_zh.is_empty()

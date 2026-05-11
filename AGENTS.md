@@ -25,6 +25,16 @@
 - Use CanvasLayer for all UI
 - Signals over _process() polling
 - Traditional Chinese default language, switchable
+- GDScript indentation: TABS ONLY (no spaces)
+- After any .gd edit, run `--check-only` before testing in editor
+
+## Testing
+- **Parse validation**: `godot --headless --quit --check-only` — run after EVERY .gd edit
+- **Hero sweep** — RUN THIS YOURSELF after any change to hero_data.gd, battle_scene.gd (_load_test_hero), hero_select.gd (HERO_DATA dict), CardData enums, or BattleManager init. Do NOT wait to be asked.
+  `python3 scripts/tests/hero_sweep.py` — all 19 heroes (~10s)
+  `python3 scripts/tests/hero_sweep.py --quick` — 3 key heroes (~3s, for targeted changes)
+- **Battle smoke**: `timeout 15 godot --headless res://scenes/battle/battle.tscn` — run after battle logic changes
+- Test results saved to `test-results/hero_sweep.json` (git-ignored)
 
 ## Current Status
 - Prototyping phase: core battle system complete

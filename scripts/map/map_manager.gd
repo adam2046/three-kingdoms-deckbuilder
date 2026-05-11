@@ -109,6 +109,25 @@ func _create_enemy_for_id(enemy_id: String):  # Returns EnemyData
             enemy.name_en = "Zhang Jiao"
             enemy.max_hp = 15
             enemy.intent_pattern = [0, 3, 0, 2]  # ATTACK, SKILL, ATTACK, BUFF
+        "dong_zhuo_soldier":
+            enemy.id = "dong_zhuo_soldier"
+            enemy.name_zh = "董卓兵"
+            enemy.name_en = "Dong Zhuo Soldier"
+            enemy.max_hp = 6
+            enemy.intent_pattern = [0, 0, 2]  # ATTACK, ATTACK, DEFEND
+        "hu_lao_guard":
+            enemy.id = "hu_lao_guard"
+            enemy.name_zh = "虎牢守將"
+            enemy.name_en = "Hu Lao Guard"
+            enemy.max_hp = 9
+            enemy.intent_pattern = [0, 2, 3, 0]  # ATTACK, BUFF, SKILL, ATTACK
+        "lv_bu":
+            enemy.id = "lv_bu"
+            enemy.name_zh = "呂布"
+            enemy.name_en = "Lu Bu"
+            enemy.max_hp = 18
+            enemy.intent_pattern = [0, 0, 3, 0, 2]  # ATTACK, ATTACK, SKILL, ATTACK, BUFF
+            enemy.requires_double_dodge = true
         _:
             enemy.id = enemy_id
             enemy.name_zh = "敵兵"
@@ -128,6 +147,12 @@ func _get_intent_value(intent: int, enemy_id: String) -> int:
             return 2 if intent == 0 else 1  # ATTACK=0
         "zhang_jiao":
             return 3 if intent == 0 else (2 if intent == 3 else 1)  # ATTACK=0, SKILL=3
+        "dong_zhuo_soldier":
+            return 2 if intent == 0 else 1
+        "hu_lao_guard":
+            return 3 if intent == 0 else (2 if intent == 3 else 1)
+        "lv_bu":
+            return 2 if intent == 0 else (3 if intent == 3 else 2)
         _:
             return 1
 

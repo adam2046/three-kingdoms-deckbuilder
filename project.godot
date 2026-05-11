@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 PlayerData="*res://scripts/data/player_data.gd"
+MetaData="*res://scripts/data/meta_data.gd"
 
 [display]
 

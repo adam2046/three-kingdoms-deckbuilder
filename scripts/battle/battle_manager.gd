@@ -254,6 +254,7 @@ func _has_crossbow() -> bool:
 
 func use_dodge(card: CardData) -> bool:
 	## Player uses a 閃 to block the current enemy attack.
+	## Does NOT emit dodge_response_received — caller (UI) decides when to resolve.
 	if card.sub_type != CardData.SubType.DODGE:
 		return false
 	if not hand.has(card):
@@ -262,8 +263,20 @@ func use_dodge(card: CardData) -> bool:
 	discard_pile.append(card)
 	dodge_used_this_attack = true
 	print("[Dodge] %s blocks the attack!" % card.name_zh)
-	dodge_response_received.emit()
 	return true
+
+
+func resolve_dodge() -> void:
+	## Called by UI when enough 閃 cards have been played (for 無雙 double-dodge).
+	dodge_response_received.emit()
+
+
+func _current_attacker_requires_double() -> bool:
+	## Check if the current attacking enemy has 無雙.
+	for enemy in enemies:
+		if enemy.requires_double_dodge and enemy.current_intent == EnemyData.Intent.ATTACK:
+			return true
+	return false
 
 
 func skip_dodge() -> void:
@@ -281,6 +294,17 @@ func _all_enemies_dead() -> bool:
 		if e.is_alive():
 			return false
 	return true
+
+
+func _check_victory() -> bool:
+	## Check if all enemies are dead. If yes, emit victory and return true.
+	## Call this after any player action that could kill the last enemy.
+	enemies = enemies.filter(func(e): return e.is_alive())
+	if enemies.is_empty():
+		_award_victory_gold()
+		battle_ended.emit(true)
+		return true
+	return false
 
 
 # ============================================================
@@ -413,6 +437,11 @@ func play_card(card: CardData, target = null) -> bool:
 					if target and target is EnemyData:
 						target.take_damage(dmg)
 						print("Dealt %d damage to %s (HP: %d/%d)" % [dmg, target.name_zh, target.current_hp, target.max_hp])
+						if _check_victory():
+							# Victory detected — clean up and return early
+							hand.erase(card)
+							discard_pile.append(card)
+							return true
 					energy_used += 1
 				CardData.SubType.DODGE:
 					return false  # Can only be played in response to 殺
@@ -445,6 +474,7 @@ func _resolve_strategy(card: CardData, target) -> void:
 			if target and target is EnemyData and target.is_alive():
 				target.take_damage(1)
 				print("[過河拆橋] %s loses 1 HP (discard adapted for PvE)" % target.name_zh)
+				_check_victory()
 		CardData.SubType.STEAL:
 			# 順手牽羊: Steal 1 card from target (PvE adaptation: draw 1 card)
 			draw_cards(1)
@@ -462,6 +492,7 @@ func _resolve_strategy(card: CardData, target) -> void:
 					duel_dmg += 1  # 無雙: overwhelming duel
 				target.take_damage(duel_dmg)
 				print("[決鬥] %s takes %d duel damage (HP: %d/%d)" % [target.name_zh, duel_dmg, target.current_hp, target.max_hp])
+				_check_victory()
 		CardData.SubType.BARBARIAN:
 			# 南蠻入侵: All enemies must play 殺 or take 1 damage
 			_aoe_damage(1)
@@ -682,7 +713,7 @@ func _aoe_damage(amount: int) -> void:
 	for enemy in enemies.duplicate():
 		if enemy.is_alive():
 			enemy.take_damage(amount)
-	enemies = enemies.filter(func(e): return e.is_alive())
+	_check_victory()
 
 
 func take_damage(amount: int) -> void:

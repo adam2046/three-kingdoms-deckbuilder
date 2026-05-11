@@ -54,9 +54,22 @@ static func zone_1() -> ZoneDef:
 	return ZoneDef.new("zone_1", "黃巾之亂", "Yellow Turban Rebellion", nodes, "zhang_jiao")
 
 
+## Zone 2: 虎牢關 (Hu Lao Gate)
+static func zone_2() -> ZoneDef:
+	var nodes: Array = []
+	nodes.append(NodeDef.new(NodeType.START, "虎牢關", "Hu Lao Gate"))
+	nodes.append(NodeDef.new(NodeType.BATTLE, "遭遇戰", "Skirmish", ["dong_zhuo_soldier"]))
+	nodes.append(NodeDef.new(NodeType.SHOP, "商店", "Shop"))
+	nodes.append(NodeDef.new(NodeType.CAMPFIRE, "營火", "Campfire"))
+	nodes.append(NodeDef.new(NodeType.ELITE, "虎牢守將", "Hu Lao Guardian", ["hu_lao_guard"]))
+	nodes.append(NodeDef.new(NodeType.EVENT, "事件", "Event"))
+	nodes.append(NodeDef.new(NodeType.BOSS, "呂布", "Lu Bu", ["lv_bu"]))
+	return ZoneDef.new("zone_2", "虎牢關", "Hu Lao Gate", nodes, "lv_bu")
+
+
 ## All zones in order
 static func all_zones() -> Array[ZoneDef]:
-	return [zone_1()]
+	return [zone_1(), zone_2()]
 
 
 ## Get a zone by index

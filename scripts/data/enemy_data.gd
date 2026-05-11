@@ -20,6 +20,7 @@ enum Intent { ATTACK, DEFEND, BUFF, SKILL }
 var current_hp: int
 var current_intent: Intent
 var intent_value: int = 1  # e.g. damage amount for ATTACK, block amount for DEFEND
+var requires_double_dodge: bool = false  # 無雙: needs 2 閃 to block
 
 func initialize() -> void:
     current_hp = max_hp
