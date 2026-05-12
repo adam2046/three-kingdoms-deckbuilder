@@ -2,3 +2,5 @@ res://scripts/battle/battle_scene.gd
 res://scripts/battle/card_node.gd
 res://scripts/data/player_data.gd
 res://scripts/battle/battle_manager.gd
+res://scripts/data/map_data.gd
+res://scripts/map/map_manager.gd

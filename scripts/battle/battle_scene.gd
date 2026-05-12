@@ -59,10 +59,14 @@ func _ready() -> void:
 	battle_manager.map_manager = map_manager
 	map_manager.node_changed.connect(_on_node_changed)
 	map_manager.gold_changed.connect(_on_gold_changed)
+	map_manager.run_ended.connect(_on_run_ended)
 	menu_btn.pressed.connect(_on_return_to_menu)
 	
 	# Load test hero BEFORE starting run (run triggers first battle)
 	_load_test_hero(PlayerData.chosen_hero_id)  # Hero chosen on select screen
+	
+	# Initialize run state (HP, deck) — persists across all battles in this run
+	battle_manager.initialize_run()
 	
 	# Now start the roguelike run — triggers _on_node_changed → _start_battle
 	map_manager.start_run()
@@ -230,6 +234,38 @@ func _load_test_hero(hero_id: String = "zhao_yun") -> void:
 			hero.skill_1_name_zh = "離間"
 			hero.skill_1_desc_zh = "force 2 enemies to duel"
 			hero.starting_deck = _create_starter_deck_balanced()
+		"huang_yueying":
+			hero.name_zh = "黃月英"
+			hero.max_hp = 3
+			hero.faction = HeroData.Faction.SHU
+			hero.archetype = HeroData.Archetype.CONTROL
+			hero.skill_1_name_zh = "集智"
+			hero.skill_1_desc_zh = "strategy → draw 1"
+			hero.starting_deck = _create_starter_deck_balanced()
+		"xiahou_yuan":
+			hero.name_zh = "夏侯淵"
+			hero.max_hp = 4
+			hero.faction = HeroData.Faction.WEI
+			hero.archetype = HeroData.Archetype.ATTACK
+			hero.skill_1_name_zh = "疾行"
+			hero.skill_1_desc_zh = "2 殺 per turn"
+			hero.starting_deck = _create_starter_deck_attack()
+		"lv_meng":
+			hero.name_zh = "呂蒙"
+			hero.max_hp = 4
+			hero.faction = HeroData.Faction.WU
+			hero.archetype = HeroData.Archetype.BALANCED
+			hero.skill_1_name_zh = "克己"
+			hero.skill_1_desc_zh = "skip discard, draw 1"
+			hero.starting_deck = _create_starter_deck_balanced()
+		"gan_ning":
+			hero.name_zh = "甘寧"
+			hero.max_hp = 4
+			hero.faction = HeroData.Faction.WU
+			hero.archetype = HeroData.Archetype.ATTACK
+			hero.skill_1_name_zh = "奇襲"
+			hero.skill_1_desc_zh = "discard equipment → 2 dmg"
+			hero.starting_deck = _create_starter_deck_attack()
 		_:
 			# Fallback: treat unknown heroes as balanced
 			hero.name_zh = hero_id
@@ -670,6 +706,26 @@ func _on_return_to_menu() -> void:
 	get_tree().change_scene_to_file("res://scenes/menu/main_menu.tscn")
 
 
+func _on_run_ended(victory: bool) -> void:
+	## Handle end of run (all zones cleared or final boss defeated).
+	# Victory: show congratulations, record run
+	if victory:
+		print("RUN COMPLETE! All zones cleared!")
+		MetaData.record_run(true, map_manager.run_data.current_zone + 1)
+		MetaData.save()
+		# Show victory overlay
+		reward_overlay.visible = true
+		reward_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+		reward_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		reward_title.text = "🎉 通關! 金幣: %d | 靈: %d" % [map_manager.get_gold(), MetaData.spirit_points]
+		# Clear any children in reward container
+		for child in reward_container.get_children():
+			reward_container.remove_child(child)
+			child.queue_free()
+		end_turn_btn.visible = false
+		skill_btn.visible = false
+
+
 func _on_awaiting_dodge(enemy_name: String, damage: int) -> void:
 	## Enemy is attacking — enable dodge response mode.
 	dodge_response_active = true
@@ -753,6 +809,7 @@ func _get_skill_label(hero_id: String) -> String:
 		"xu_chu": return "裸衣"
 		"zhang_jiao": return "雷擊"
 		"zhuge_liang": return "觀星"
+		"diao_chan": return "離間"
 		_: return "技能"
 
 

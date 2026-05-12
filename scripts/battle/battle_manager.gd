@@ -46,6 +46,7 @@ var map_manager = null            # Roguelike progression (MapManager)
 # -- Skill state --
 var skill_used_this_turn: Dictionary = {}  # e.g. {"zhiheng": true}
 var xu_chu_luoyi_active: bool = false      # 許褚 裸衣 toggle state
+var xiahou_yuan_extra_slash: bool = false   # 夏侯淵 疾行: extra slash per turn
 
 # -- Enemies --
 var enemies: Array = []       # Array of EnemyData/Node references
@@ -124,6 +125,8 @@ func _has_active_skill() -> bool:
 			return not skill_used_this_turn.get("leiji", false) and _get_first_alive_enemy() != null
 		"zhuge_liang":
 			return not skill_used_this_turn.get("guanxing", false) and not deck.is_empty()
+		"diao_chan":
+			return enemies.size() >= 2 and not skill_used_this_turn.get("lijian", false)
 	return false
 
 
@@ -139,6 +142,7 @@ func _get_active_skill_name() -> String:
 		"xu_chu": return "luoyi"
 		"zhang_jiao": return "leiji"
 		"zhuge_liang": return "guanxing"
+		"diao_chan": return "lijian"
 		_: return ""
 
 
@@ -163,6 +167,8 @@ func _activate_skill(skill_name: String) -> bool:
 			return _skill_leiji()
 		"guanxing":
 			return _skill_guanxing()
+		"lijian":
+			return _skill_lijian()
 	return false
 
 
@@ -380,6 +386,28 @@ func _skill_guanxing() -> bool:
 	return true
 
 
+func _skill_lijian() -> bool:
+	## 貂蟬 離間: force 2 enemies to duel each other — each takes 1 damage.
+	if skill_used_this_turn.get("lijian", false):
+		return false
+	if enemies.size() < 2:
+		return false
+	skill_used_this_turn["lijian"] = true
+	var alive_enemies := enemies.filter(func(e): return e.is_alive())
+	if alive_enemies.size() < 2:
+		return false
+	# First two alive enemies duel
+	alive_enemies[0].take_damage(1)
+	alive_enemies[1].take_damage(1)
+	print("[離間] %s and %s duel each other — each takes 1 damage!" % [alive_enemies[0].name_zh, alive_enemies[1].name_zh])
+	# Check if any died
+	enemies = enemies.filter(func(e): return e.is_alive())
+	if enemies.is_empty():
+		_award_victory_gold()
+		battle_ended.emit(true)
+	return true
+
+
 func _get_first_alive_enemy() -> EnemyData:
 	## Helper: get the first alive enemy, or null.
 	for e in enemies:
@@ -392,23 +420,44 @@ func _ready() -> void:
 	pass  # Battle is initialized externally after hero is loaded
 
 
-func initialize_battle() -> void:
-	## Called once at battle start. Loads hero, shuffles deck, draws opening hand.
+func initialize_run() -> void:
+	## Called ONCE at the start of a new run. Resets HP to full, loads starting deck.
 	player_hp = player_hero.max_hp
 	player_max_hp = player_hero.max_hp
+	
+	# Load starting deck for the entire run
+	deck = player_hero.starting_deck.duplicate()
+	discard_pile.clear()
+
+
+func initialize_battle() -> void:
+	## Called at each battle start. Preserves HP/deck from previous battle.
+	## If first battle of run (deck empty), fall back to starting deck.
+	if deck.is_empty() and discard_pile.is_empty():
+		deck = player_hero.starting_deck.duplicate()
+	
 	hand_size_limit = player_hp
 	
-	# Load starting deck and shuffle
-	deck = player_hero.starting_deck.duplicate()
+	# Shuffle remaining deck + discard pile together
+	_reshuffle_discard()
 	shuffle_deck()
 	
 	# Draw 4 cards (standard 三國殺 opening hand)
 	draw_cards(4)
 	
+	# Reset per-battle state
+	energy_used = 0
+	block = 0
+	wine_active = false
+	attack_limit_reached = false
+	skill_used_this_turn.clear()
+	xu_chu_luoyi_active = false
+	xiahou_yuan_extra_slash = false
+	
 	# Set up follower if hero starts with one
 	_setup_follower()
 	
-	# Spawn test enemy
+	# Spawn enemy for this node
 	_spawn_test_enemy()
 	
 	start_turn()
@@ -998,11 +1047,29 @@ func take_damage(amount: int) -> void:
 	player_hp = max(0, player_hp - effective)
 	_on_damage_taken(effective)  # Trigger hero skill reactions (e.g. 奸雄, 反饋, 剛烈)
 	if player_hp <= 0:
-		# Check for 桃 rescue opportunity
-		# Check for 天香 (小喬) — auto-negate if red card in hand
-		if player_hero.id == "xiao_qiao":
-			pass  # 天香 is handled in _on_damage_taken above
-		battle_ended.emit(false)
+		# 桃 self-rescue: check if player has 桃 in hand
+		var rescued := false
+		for card in hand:
+			if card.sub_type == CardData.SubType.PEACH:
+				hand.erase(card)
+				discard_pile.append(card)
+				player_hp = 1
+				print("[Rescue] 桃 played at 0 HP → restored to 1 HP")
+				rescued = true
+				break
+		if not rescued:
+			# Check 天香 (小喬) — auto-negate if red card in hand
+			if player_hero.id == "xiao_qiao":
+				for card in hand:
+					if card.is_red():
+						hand.erase(card)
+						discard_pile.append(card)
+						player_hp = 1
+						print("[天香] Red card discarded → restored to 1 HP")
+						rescued = true
+						break
+			if not rescued:
+				battle_ended.emit(false)
 
 func _setup_follower() -> void:
 	## Check if hero archetype is SUPPORT — they may start with a follower.
