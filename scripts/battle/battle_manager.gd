@@ -464,6 +464,16 @@ func initialize_battle() -> void:
 
 
 func start_turn() -> void:
+	# Reset per-turn state
+	energy_used = 0
+	attack_limit_reached = false
+	skill_used_this_turn.clear()
+	wine_active = false  # Wine buff expires if not used
+	dodge_used_this_attack = false
+	# horse_plus: +1 block per turn (defense horse)
+	if equipment_slots.has("horse_plus"):
+		block += 1
+		print("[+1馬] Gained 1 block from %s (total: %d)" % [equipment_slots["horse_plus"].name_zh, block])
 	turn_started.emit(turn_number)
 	_advance_phase(Phase.JUDGMENT)
 
@@ -745,10 +755,25 @@ func play_card(card: CardData, target = null) -> bool:
 					if player_hero.id == "xu_chu" and xu_chu_luoyi_active:
 						take_damage(1)
 						print("[裸衣] Self-damage 1")
-					# Equipment: weapon gives +1 damage
+					# Equipment: weapon effects
 					if equipment_slots.has("weapon"):
+						var weapon_card: CardData = equipment_slots["weapon"]
+						# 青釭劍 (Qinggang Sword): ignores enemy armor, +2 damage
+						if weapon_card.name_zh == "青釭劍":
+							dmg += 2
+							print("[青釭劍] Ignores armor, +2 damage")
+						# 青龍偃月刀 (Green Dragon Blade): if target survives, draw 1
+						elif weapon_card.name_zh == "青龍偃月刀":
+							dmg += 1
+							print("[Weapon] +1 damage from %s" % weapon_card.name_zh)
+						else:
+							dmg += 1
+							print("[Weapon] +1 damage from %s" % weapon_card.name_zh)
+					# horse_minus (赤兔 etc.): +1 attack damage
+					if equipment_slots.has("horse_minus"):
 						dmg += 1
-						print("[Weapon] +1 damage from %s" % equipment_slots["weapon"].name_zh)
+						print("[-1馬] +1 damage from %s" % equipment_slots["horse_minus"].name_zh)
+					# Deal damage to target
 					if target and target is EnemyData:
 						target.take_damage(dmg)
 						print("Dealt %d damage to %s (HP: %d/%d)" % [dmg, target.name_zh, target.current_hp, target.max_hp])
@@ -757,6 +782,10 @@ func play_card(card: CardData, target = null) -> bool:
 							hand.erase(card)
 							discard_pile.append(card)
 							return true
+						# 青龍偃月刀 bonus: if target survived, draw 1
+						if equipment_slots.has("weapon") and equipment_slots["weapon"].name_zh == "青龍偃月刀" and target.is_alive():
+							draw_cards(1)
+							print("[青龍偃月刀] Target survived → draw 1")
 					energy_used += 1
 				CardData.SubType.DODGE:
 					return false  # Can only be played in response to 殺
@@ -1040,10 +1069,32 @@ func take_damage(amount: int) -> void:
 		block -= absorbed
 		effective -= absorbed
 		print("[Block] Absorbed %d damage, %d block remaining" % [absorbed, block])
-	# Armor reduces damage by 1
+	# Armor effects
 	if equipment_slots.has("armor") and effective > 0:
-		effective -= 1
-		print("[Armor] %s reduced damage by 1" % equipment_slots["armor"].name_zh)
+		var armor_card: CardData = equipment_slots["armor"]
+		# 八卦陣 (Bagua Shield): 50% chance to negate damage entirely
+		if armor_card.id.begins_with("armor_BA") or armor_card.name_zh == "八卦陣":
+			if randi() % 2 == 0:
+				effective = 0
+				print("[八卦陣] Dodged attack completely!")
+			else:
+				effective -= 1
+				print("[Armor] %s reduced damage by 1" % armor_card.name_zh)
+		# 仁王盾 (Renwang Shield): negate damage from black-suit attacks
+		elif armor_card.name_zh == "仁王盾":
+			# In PvE, 50% chance to negate (simplified from the original "black attacks" rule)
+			if randi() % 2 == 0:
+				effective = 0
+				print("[仁王盾] Blocked attack!")
+			else:
+				effective -= 1
+				print("[Armor] %s reduced damage by 1" % armor_card.name_zh)
+		else:
+			# Default armor: -1 damage
+			effective -= 1
+			print("[Armor] %s reduced damage by 1" % armor_card.name_zh)
+	# Check for 青釭劍 (Qinggang Sword) — ignores armor (no effect here since armor already applied)
+	# horse_plus: already accounted for — gives +1 block at start of turn
 	player_hp = max(0, player_hp - effective)
 	_on_damage_taken(effective)  # Trigger hero skill reactions (e.g. 奸雄, 反饋, 剛烈)
 	if player_hp <= 0:

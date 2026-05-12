@@ -473,6 +473,15 @@ func _refresh_stats() -> void:
 		energy_label.text += "  🍶"
 	if battle_manager.block > 0:
 		energy_label.text += "  🛡%d" % battle_manager.block
+	# Equipment display
+	var equip_text := ""
+	for slot in ["weapon", "armor", "horse_plus", "horse_minus"]:
+		if battle_manager.equipment_slots.has(slot):
+			var card: CardData = battle_manager.equipment_slots[slot]
+			var slot_icon := {"weapon": "⚔️", "armor": "🛡️", "horse_plus": "🐴+", "horse_minus": "🐴-"}
+			equip_text += " %s%s" % [slot_icon.get(slot, ""), card.name_zh]
+	if equip_text != "":
+		energy_label.text += equip_text
 	deck_label.text = "牌庫: %d" % battle_manager.deck.size()
 	discard_label.text = "棄牌: %d" % battle_manager.discard_pile.size()
 
