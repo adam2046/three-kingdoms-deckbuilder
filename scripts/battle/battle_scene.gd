@@ -801,12 +801,7 @@ func _on_node_changed(node_type: int, node_index: int) -> void:
 			# Only auto-start battles. Campfire/shop/event are handled separately.
 			_start_battle()
 		2:  # CAMPFIRE=2
-			# Heal 20% max HP (rounded up) + upgrade 1 random card
-			var heal_amount: int = max(1, ceil(battle_manager.player_max_hp * 0.2))
-			battle_manager.player_hp = min(battle_manager.player_hp + heal_amount, battle_manager.player_max_hp)
-			print("[Campfire] Healed %d HP (now %d/%d)" % [heal_amount, battle_manager.player_hp, battle_manager.player_max_hp])
-			battle_manager.upgrade_random_card()
-			map_manager.advance_to_next_node()
+			_show_campfire()
 		5:  # SHOP=5
 			_show_shop()  # Player interacts, then advance is called from shop handlers
 		6:  # EVENT=6
@@ -954,6 +949,260 @@ func _hide_card_rewards() -> void:
 func _generate_reward_cards(count: int) -> Array:
 	## Generate random cards for reward selection using the full 108-card library.
 	return CardLibrary.get_random_rewards(count)
+
+
+# ============================================================
+#  CAMPFIRE SYSTEM
+# ============================================================
+
+var campfire_active: bool = false
+
+func _show_campfire() -> void:
+	## Show campfire choices: Rest (heal 30% HP) or Upgrade (pick a card to upgrade).
+	if campfire_active:
+		return
+
+	# Mouse filter fix: same as shop
+	reward_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	reward_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	campfire_active = true
+
+	# Clear previous overlay contents
+	for child in reward_container.get_children():
+		reward_container.remove_child(child)
+		child.queue_free()
+
+	reward_overlay.visible = true
+	reward_title.text = "🔥 營火 — 休息或升級?"
+
+	# Hide battle UI
+	$EnemyArea.visible = false
+	end_turn_btn.visible = false
+	skill_btn.visible = false
+
+	# -- Rest button --
+	var rest_btn := Button.new()
+	rest_btn.custom_minimum_size = Vector2(180, 120)
+	var heal_preview: int = max(1, ceil(battle_manager.player_max_hp * 0.3))
+	rest_btn.text = "休息\n回復 %d HP\n(%d/%d → %d/%d)" % [
+		heal_preview,
+		battle_manager.player_hp, battle_manager.player_max_hp,
+		min(battle_manager.player_hp + heal_preview, battle_manager.player_max_hp),
+		battle_manager.player_max_hp
+	]
+	rest_btn.tooltip_text = "回復30%最大體力值"
+	# Warm orange style
+	var rest_style := StyleBoxFlat.new()
+	rest_style.bg_color = Color(0.4, 0.25, 0.1, 0.9)
+	rest_style.border_color = Color(0.9, 0.6, 0.2)
+	rest_style.border_width_top = 3
+	rest_style.border_width_bottom = 3
+	rest_style.border_width_left = 3
+	rest_style.border_width_right = 3
+	rest_style.corner_radius_top_left = 10
+	rest_style.corner_radius_top_right = 10
+	rest_style.corner_radius_bottom_left = 10
+	rest_style.corner_radius_bottom_right = 10
+	rest_btn.add_theme_stylebox_override("normal", rest_style)
+	var rest_hover := StyleBoxFlat.new()
+	rest_hover.bg_color = Color(0.5, 0.35, 0.15, 0.95)
+	rest_hover.border_color = Color(1.0, 0.7, 0.3)
+	rest_hover.border_width_top = 3
+	rest_hover.border_width_bottom = 3
+	rest_hover.border_width_left = 3
+	rest_hover.border_width_right = 3
+	rest_hover.corner_radius_top_left = 10
+	rest_hover.corner_radius_top_right = 10
+	rest_hover.corner_radius_bottom_left = 10
+	rest_hover.corner_radius_bottom_right = 10
+	rest_btn.add_theme_stylebox_override("hover", rest_hover)
+	rest_btn.add_theme_font_size_override("font_size", 14)
+	rest_btn.pressed.connect(_on_campfire_rest)
+	reward_container.add_child(rest_btn)
+
+	# -- Upgrade button --
+	var upgrade_btn := Button.new()
+	upgrade_btn.custom_minimum_size = Vector2(180, 120)
+	upgrade_btn.text = "升級\n選擇一張牌升級"
+	upgrade_btn.tooltip_text = "選擇手牌中的一張牌進行升級"
+	var up_style := StyleBoxFlat.new()
+	up_style.bg_color = Color(0.1, 0.2, 0.4, 0.9)
+	up_style.border_color = Color(0.3, 0.6, 0.9)
+	up_style.border_width_top = 3
+	up_style.border_width_bottom = 3
+	up_style.border_width_left = 3
+	up_style.border_width_right = 3
+	up_style.corner_radius_top_left = 10
+	up_style.corner_radius_top_right = 10
+	up_style.corner_radius_bottom_left = 10
+	up_style.corner_radius_bottom_right = 10
+	upgrade_btn.add_theme_stylebox_override("normal", up_style)
+	var up_hover := StyleBoxFlat.new()
+	up_hover.bg_color = Color(0.15, 0.3, 0.5, 0.95)
+	up_hover.border_color = Color(0.5, 0.8, 1.0)
+	up_hover.border_width_top = 3
+	up_hover.border_width_bottom = 3
+	up_hover.border_width_left = 3
+	up_hover.border_width_right = 3
+	up_hover.corner_radius_top_left = 10
+	up_hover.corner_radius_top_right = 10
+	up_hover.corner_radius_bottom_left = 10
+	up_hover.corner_radius_bottom_right = 10
+	upgrade_btn.add_theme_stylebox_override("hover", up_hover)
+	upgrade_btn.add_theme_font_size_override("font_size", 14)
+	upgrade_btn.pressed.connect(_on_campfire_upgrade)
+	reward_container.add_child(upgrade_btn)
+
+
+func _on_campfire_rest() -> void:
+	## Player chose Rest at campfire — heal 30% of max HP.
+	var heal_amount: int = max(1, ceil(battle_manager.player_max_hp * 0.3))
+	var old_hp: int = battle_manager.player_hp
+	battle_manager.player_hp = min(battle_manager.player_hp + heal_amount, battle_manager.player_max_hp)
+	var actual_heal: int = battle_manager.player_hp - old_hp
+	print("[Campfire] Rest: healed %d HP (now %d/%d)" % [actual_heal, battle_manager.player_hp, battle_manager.player_max_hp])
+
+	_hide_campfire()
+	map_manager.advance_to_next_node()
+
+
+func _on_campfire_upgrade() -> void:
+	## Player chose Upgrade at campfire — show all deck cards for selection.
+	# Clear the rest/upgrade buttons
+	for child in reward_container.get_children():
+		reward_container.remove_child(child)
+		child.queue_free()
+
+	reward_title.text = "🔥 升級 — 選擇一張牌"
+
+	if battle_manager.deck.is_empty():
+		reward_title.text = "🔥 牌組為空，無法升級"
+		await get_tree().create_timer(1.0).timeout
+		_hide_campfire()
+		map_manager.advance_to_next_node()
+		return
+
+	# Show each deck card as a clickable button
+	for i: int in range(battle_manager.deck.size()):
+		var card: CardData = battle_manager.deck[i]
+		var already_upgraded: bool = card.name_zh.ends_with("+")
+
+		var card_btn := Button.new()
+		card_btn.custom_minimum_size = Vector2(120, 80)
+
+		if already_upgraded:
+			card_btn.text = "%s\n(已升級)" % card.name_zh
+			card_btn.disabled = true
+			var dis_style := StyleBoxFlat.new()
+			dis_style.bg_color = Color(0.15, 0.15, 0.15, 0.6)
+			dis_style.border_color = Color(0.3, 0.3, 0.3)
+			dis_style.border_width_top = 2
+			dis_style.border_width_bottom = 2
+			dis_style.border_width_left = 2
+			dis_style.border_width_right = 2
+			dis_style.corner_radius_top_left = 8
+			dis_style.corner_radius_top_right = 8
+			dis_style.corner_radius_bottom_left = 8
+			dis_style.corner_radius_bottom_right = 8
+			card_btn.add_theme_stylebox_override("normal", dis_style)
+		else:
+			# Build a preview of what the upgrade does
+			var up_card: CardData = battle_manager.get_upgraded_card(card)
+			var preview: String = card.name_zh
+			if up_card and up_card != card:
+				if up_card.damage > card.damage:
+					preview += "\n攻擊 %d→%d" % [card.damage, up_card.damage]
+				if up_card.block > card.block:
+					preview += "\n防禦 %d→%d" % [card.block, up_card.block]
+				if up_card.heal > card.heal:
+					preview += "\n回復 %d→%d" % [card.heal, up_card.heal]
+				if up_card.draw_count > card.draw_count:
+					preview += "\n摸牌 %d→%d" % [card.draw_count, up_card.draw_count]
+			card_btn.text = "升級\n%s" % preview
+
+			var card_style := StyleBoxFlat.new()
+			card_style.bg_color = Color(0.12, 0.15, 0.25, 0.9)
+			card_style.border_color = Color(0.4, 0.6, 0.9)
+			card_style.border_width_top = 2
+			card_style.border_width_bottom = 2
+			card_style.border_width_left = 2
+			card_style.border_width_right = 2
+			card_style.corner_radius_top_left = 8
+			card_style.corner_radius_top_right = 8
+			card_style.corner_radius_bottom_left = 8
+			card_style.corner_radius_bottom_right = 8
+			card_btn.add_theme_stylebox_override("normal", card_style)
+			var card_hover := StyleBoxFlat.new()
+			card_hover.bg_color = Color(0.2, 0.3, 0.5, 0.95)
+			card_hover.border_color = Color(0.6, 0.8, 1.0)
+			card_hover.border_width_top = 2
+			card_hover.border_width_bottom = 2
+			card_hover.border_width_left = 2
+			card_hover.border_width_right = 2
+			card_hover.corner_radius_top_left = 8
+			card_hover.corner_radius_top_right = 8
+			card_hover.corner_radius_bottom_left = 8
+			card_hover.corner_radius_bottom_right = 8
+			card_btn.add_theme_stylebox_override("hover", card_hover)
+			card_btn.add_theme_font_size_override("font_size", 12)
+			card_btn.pressed.connect(_on_campfire_card_selected.bind(i))
+
+		reward_container.add_child(card_btn)
+
+	# Add a "Skip" button at the end
+	var skip_btn := Button.new()
+	skip_btn.custom_minimum_size = Vector2(120, 80)
+	skip_btn.text = "跳過"
+	skip_btn.tooltip_text = "不升級，繼續前進"
+	var skip_style := StyleBoxFlat.new()
+	skip_style.bg_color = Color(0.2, 0.1, 0.1, 0.8)
+	skip_style.border_color = Color(0.5, 0.3, 0.3)
+	skip_style.border_width_top = 2
+	skip_style.border_width_bottom = 2
+	skip_style.border_width_left = 2
+	skip_style.border_width_right = 2
+	skip_style.corner_radius_top_left = 8
+	skip_style.corner_radius_top_right = 8
+	skip_style.corner_radius_bottom_left = 8
+	skip_style.corner_radius_bottom_right = 8
+	skip_btn.add_theme_stylebox_override("normal", skip_style)
+	skip_btn.pressed.connect(_on_campfire_skip)
+	reward_container.add_child(skip_btn)
+
+
+func _on_campfire_card_selected(index: int) -> void:
+	## Player selected a card to upgrade at campfire.
+	var success: bool = battle_manager.upgrade_specific_card(index)
+	if success:
+		var card: CardData = battle_manager.deck[index]
+		phase_label.text = "🔥 升級: %s" % card.name_zh
+	else:
+		phase_label.text = "🔥 無法升級此牌"
+	_refresh_ui()
+
+	_hide_campfire()
+	map_manager.advance_to_next_node()
+
+
+func _on_campfire_skip() -> void:
+	## Player skipped the upgrade.
+	print("[Campfire] Skipped upgrade")
+	_hide_campfire()
+	map_manager.advance_to_next_node()
+
+
+func _hide_campfire() -> void:
+	## Hide campfire overlay and restore battle UI.
+	reward_overlay.visible = false
+	campfire_active = false
+
+	$EnemyArea.visible = true
+
+	# Clear overlay children
+	for child in reward_container.get_children():
+		reward_container.remove_child(child)
+		child.queue_free()
 
 
 # ============================================================

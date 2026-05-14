@@ -968,6 +968,37 @@ func upgrade_random_card() -> bool:
 	return true
 
 
+func upgrade_specific_card(index: int) -> bool:
+	## Upgrade the card at the given deck index.
+	## Returns true if upgrade happened, false if card has no upgrade variant.
+	if deck.is_empty() or index < 0 or index >= deck.size():
+		print("[Upgrade] Invalid deck index %d" % index)
+		return false
+	
+	var old_card: CardData = deck[index]
+	# Already-upgraded cards (name_zh ends with "+") cannot be upgraded again
+	if old_card.name_zh.ends_with("+"):
+		print("[Upgrade] %s is already upgraded" % old_card.name_zh)
+		return false
+	
+	var upgraded := _create_upgraded_card(old_card)
+	if upgraded == null or upgraded == old_card:
+		print("[Upgrade] %s has no upgrade variant" % old_card.name_zh)
+		return false
+	
+	deck[index] = upgraded
+	print("[Upgrade] %s → %s (damage:%d heal:%d block:%d)" % [
+		old_card.name_zh, upgraded.name_zh,
+		upgraded.damage, upgraded.heal, upgraded.block
+	])
+	return true
+
+
+func get_upgraded_card(card: CardData) -> CardData:
+	## Public wrapper for _create_upgraded_card — returns upgraded copy or original if no upgrade.
+	return _create_upgraded_card(card)
+
+
 func _create_upgraded_card(card: CardData) -> CardData:
 	## Return an upgraded copy of the card. Returns original if no upgrade defined.
 	var up := card.duplicate()
