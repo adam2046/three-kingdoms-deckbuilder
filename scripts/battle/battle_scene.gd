@@ -1027,25 +1027,43 @@ func _show_shop() -> void:
 	# Add follower offer panel
 	if _shop_follower != null:
 		var follower_cost := Follower.get_cost(_shop_follower.follower_type)
-		var fpanel := Panel.new()
-		fpanel.custom_minimum_size = Vector2(130, 150)
-		fpanel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color(0.15, 0.25, 0.15, 0.9)
-		style.border_color = Color(0.4, 0.8, 0.4)
-		style.border_width_top = 2
-		style.border_width_bottom = 2
-		style.border_width_left = 2
-		style.border_width_right = 2
-		style.corner_radius_top_left = 8
-		style.corner_radius_top_right = 8
-		style.corner_radius_bottom_left = 8
-		style.corner_radius_bottom_right = 8
-		fpanel.add_theme_stylebox_override("panel", style)
+		# Use a Button as root so clicks are reliable (Panel+Button overlay fails in Godot 4)
+		var fbtn := Button.new()
+		fbtn.custom_minimum_size = Vector2(130, 150)
+		fbtn.mouse_filter = Control.MOUSE_FILTER_STOP
+		fbtn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		# Green-tinted style
+		var normal_style := StyleBoxFlat.new()
+		normal_style.bg_color = Color(0.15, 0.25, 0.15, 0.9)
+		normal_style.border_color = Color(0.4, 0.8, 0.4)
+		normal_style.border_width_top = 2
+		normal_style.border_width_bottom = 2
+		normal_style.border_width_left = 2
+		normal_style.border_width_right = 2
+		normal_style.corner_radius_top_left = 8
+		normal_style.corner_radius_top_right = 8
+		normal_style.corner_radius_bottom_left = 8
+		normal_style.corner_radius_bottom_right = 8
+		fbtn.add_theme_stylebox_override("normal", normal_style)
+		var hover_style := StyleBoxFlat.new()
+		hover_style.bg_color = Color(0.2, 0.35, 0.2, 0.95)
+		hover_style.border_color = Color(0.5, 0.9, 0.5)
+		hover_style.border_width_top = 2
+		hover_style.border_width_bottom = 2
+		hover_style.border_width_left = 2
+		hover_style.border_width_right = 2
+		hover_style.corner_radius_top_left = 8
+		hover_style.corner_radius_top_right = 8
+		hover_style.corner_radius_bottom_left = 8
+		hover_style.corner_radius_bottom_right = 8
+		fbtn.add_theme_stylebox_override("hover", hover_style)
+		# Connect click BEFORE adding children (bind follower type)
+		fbtn.pressed.connect(_on_shop_follower_bought.bind(_shop_follower.follower_type))
 
 		var fvbox := VBoxContainer.new()
+		# CRITICAL: VBoxContainer default = PASS (1), which SILENTLY DROPS click events
 		fvbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		fpanel.add_child(fvbox)
+		fbtn.add_child(fvbox)
 
 		var name_lbl := Label.new()
 		name_lbl.text = "🤝 %s" % _shop_follower.name_zh
@@ -1072,18 +1090,7 @@ func _show_shop() -> void:
 		cost_lbl.add_theme_font_size_override("font_size", 16)
 		fvbox.add_child(cost_lbl)
 
-		# Make the panel clickable via a Button overlay
-		var btn := Button.new()
-		btn.text = ""
-		btn.flat = true
-		btn.anchors_preset = Control.PRESET_FULL_RECT
-		btn.mouse_filter = Control.MOUSE_FILTER_STOP
-		btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		# Bind follower type so the callback knows what was bought
-		btn.pressed.connect(_on_shop_follower_bought.bind(_shop_follower.follower_type))
-		fpanel.add_child(btn)
-
-		reward_container.add_child(fpanel)
+		reward_container.add_child(fbtn)
 
 	# Hide battle UI (and EnemyArea — same overlap issue as reward cards)
 	$EnemyArea.visible = false
