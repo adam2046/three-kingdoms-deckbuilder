@@ -540,11 +540,34 @@ func _create_enemy_node(enemy: EnemyData) -> Panel:
 	return panel
 
 
+var _follower_label: Label = null
+var _follower_hp_label: Label = null
+var _follower_desc_label: Label = null
+
 func _refresh_follower() -> void:
 	var f := battle_manager.follower
 	if f and f.is_alive():
 		follower_display.visible = true
-		# TODO: Update follower labels
+		# Lazy-init follower UI labels inside the FollowerDisplay Control
+		if _follower_label == null:
+			_follower_label = Label.new()
+			_follower_label.add_theme_font_size_override("font_size", 14)
+			_follower_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			follower_display.add_child(_follower_label)
+			_follower_hp_label = Label.new()
+			_follower_hp_label.add_theme_font_size_override("font_size", 12)
+			_follower_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			follower_display.add_child(_follower_hp_label)
+			_follower_desc_label = Label.new()
+			_follower_desc_label.add_theme_font_size_override("font_size", 10)
+			_follower_desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			_follower_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			follower_display.add_child(_follower_desc_label)
+		_follower_label.text = "🤝 %s" % f.name_zh
+		_follower_hp_label.text = "HP: %d/%d" % [f.hp, f.max_hp]
+		var block_str := " 🔰護衛" if f.can_block else ""
+		_follower_hp_label.text += block_str
+		_follower_desc_label.text = f.passive_desc
 	else:
 		follower_display.visible = false
 
@@ -939,10 +962,10 @@ func _generate_reward_cards(count: int) -> Array:
 
 const SHOP_CARD_PRICE: int = 5
 var shop_active: bool = false
-
+var _shop_follower: Follower = null  # Follower offered in shop (null = follower already owned or not offered)
 
 func _show_shop() -> void:
-	## Display shop with 3 cards for purchase.
+	## Display shop: 2 cards for purchase + 1 follower (if player doesn't already have one).
 
 	# RE-ENTRANCY GUARD
 	if shop_active:
@@ -958,22 +981,35 @@ func _show_shop() -> void:
 	reward_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	shop_active = true
-	_reward_cards = _generate_reward_cards(3)
+	_reward_cards = _generate_reward_cards(2)
 
-	# Clear previous cards
-	# Use remove_child + queue_free. Do NOT use await - causes re-entrancy.
+	# Offer a random follower type if player doesn't already have one
+	_shop_follower = null
+	if battle_manager.follower == null or not battle_manager.follower.is_alive():
+		var follower_types: Array[Follower.FollowerType] = [
+			Follower.FollowerType.VOLUNTEER,
+			Follower.FollowerType.GUARDIAN,
+			Follower.FollowerType.SCOUT,
+			Follower.FollowerType.MEDIC,
+		]
+		# Strategist is rarer — 30% chance to include it in the pool
+		if randi() % 100 < 30:
+			follower_types.append(Follower.FollowerType.STRATEGIST)
+		_shop_follower = Follower.create(follower_types[randi() % follower_types.size()])
+
+	# Clear previous shop items
 	for child in reward_container.get_children():
-		reward_container.remove_child(child)  # Immediately detach
+		reward_container.remove_child(child)
 		child.queue_free()
 
 	# Show overlay with shop styling
+	var gold: int = map_manager.get_gold()
 	reward_overlay.visible = true
-	reward_title.text = "商店 — 金幣: %d  (每張 %d 金)" % [map_manager.get_gold(), SHOP_CARD_PRICE]
+	reward_title.text = "商店 — 金幣: %d" % gold
 
 	# Create card nodes with price labels
 	for card in _reward_cards:
 		var vbox := VBoxContainer.new()
-		# CRITICAL: VBoxContainer DEFAULT = PASS (1), which SILENTLY DROPS click events
 		vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var card_node = CardNode.new()
 		card_node.setup(card)
@@ -987,7 +1023,68 @@ func _show_shop() -> void:
 		vbox.add_child(price_label)
 
 		reward_container.add_child(vbox)
-	
+
+	# Add follower offer panel
+	if _shop_follower != null:
+		var follower_cost := Follower.get_cost(_shop_follower.follower_type)
+		var fpanel := Panel.new()
+		fpanel.custom_minimum_size = Vector2(130, 150)
+		fpanel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0.15, 0.25, 0.15, 0.9)
+		style.border_color = Color(0.4, 0.8, 0.4)
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_left = 8
+		style.corner_radius_bottom_right = 8
+		fpanel.add_theme_stylebox_override("panel", style)
+
+		var fvbox := VBoxContainer.new()
+		fvbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		fpanel.add_child(fvbox)
+
+		var name_lbl := Label.new()
+		name_lbl.text = "🤝 %s" % _shop_follower.name_zh
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_lbl.add_theme_font_size_override("font_size", 14)
+		fvbox.add_child(name_lbl)
+
+		var hp_lbl := Label.new()
+		hp_lbl.text = "HP: %d  ATK: %d" % [_shop_follower.max_hp, _shop_follower.attack_power]
+		hp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hp_lbl.add_theme_font_size_override("font_size", 12)
+		fvbox.add_child(hp_lbl)
+
+		var desc_lbl := Label.new()
+		desc_lbl.text = _shop_follower.passive_desc
+		desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc_lbl.add_theme_font_size_override("font_size", 11)
+		fvbox.add_child(desc_lbl)
+
+		var cost_lbl := Label.new()
+		cost_lbl.text = "%d 金" % follower_cost
+		cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cost_lbl.add_theme_font_size_override("font_size", 16)
+		fvbox.add_child(cost_lbl)
+
+		# Make the panel clickable via a Button overlay
+		var btn := Button.new()
+		btn.text = ""
+		btn.flat = true
+		btn.anchors_preset = Control.PRESET_FULL_RECT
+		btn.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		# Bind follower type so the callback knows what was bought
+		btn.pressed.connect(_on_shop_follower_bought.bind(_shop_follower.follower_type))
+		fpanel.add_child(btn)
+
+		reward_container.add_child(fpanel)
+
 	# Hide battle UI (and EnemyArea — same overlap issue as reward cards)
 	$EnemyArea.visible = false
 	end_turn_btn.visible = false
@@ -1013,10 +1110,34 @@ func _on_shop_card_bought(card: CardData) -> void:
 	_hide_shop()
 
 
+func _on_shop_follower_bought(follower_type: int) -> void:
+	## Player bought a follower from the shop.
+	if _shop_follower == null:
+		return
+	var cost := Follower.get_cost(follower_type as Follower.FollowerType)
+	if not map_manager.run_data.spend_gold(cost):
+		print("[Shop] Not enough gold for follower!")
+		return
+	
+	battle_manager.follower = Follower.create(follower_type as Follower.FollowerType)
+	print("[Shop] Recruited %s for %d gold (remaining: %d)" % [battle_manager.follower.name_zh, cost, map_manager.get_gold()])
+	reward_title.text = "商店 — 金幣: %d  (招募 %s!)" % [map_manager.get_gold(), battle_manager.follower.name_zh]
+	_shop_follower = null
+	
+	# Refresh gold display
+	if gold_label:
+		gold_label.text = "💰 %d" % map_manager.get_gold()
+	
+	# Auto-close after purchase
+	await get_tree().create_timer(0.5).timeout
+	_hide_shop()
+
+
 func _hide_shop() -> void:
 	## Hide shop overlay and advance to next node.
 	reward_overlay.visible = false
 	shop_active = false
+	_shop_follower = null
 
 	# Restore EnemyArea visibility
 	$EnemyArea.visible = true
@@ -1037,6 +1158,8 @@ func _hide_shop() -> void:
 
 func _resolve_event() -> void:
 	## Pick a random event and apply its effect.
+	## Interactive events (with choices) call _show_event_choices and return early —
+	## advance_to_next_node is called from the choice callback instead.
 	var events := [
 		"_event_borrow_arrows",
 		"_event_three_visits",
@@ -1044,10 +1167,10 @@ func _resolve_event() -> void:
 		"_event_wine_discussion",
 		"_event_peach_garden_oath",
 		"_event_wine_slash",
+		"_event_recruit_ally",
 	]
 	var event_name: String = events[randi() % events.size()]
 	call(event_name)
-	map_manager.advance_to_next_node()
 
 
 func _event_borrow_arrows() -> void:
@@ -1059,22 +1182,20 @@ func _event_borrow_arrows() -> void:
 		map_manager.run_data.spend_gold(5)
 		phase_label.text = "草船借箭: 失去5金幣..."
 	print("[Event] 草船借箭: %s" % phase_label.text)
+	map_manager.advance_to_next_node()
 
 
 func _event_three_visits() -> void:
-	## 三顧茅廬: Gain a follower if you don't have one
+	## 三顧茅廬: Gain a random follower if you don't have one
 	if battle_manager.follower and battle_manager.follower.is_alive():
 		phase_label.text = "三顧茅廬: 已有隨從, 無事發生"
 	else:
-		var f = Follower.new()
-		f.name_zh = "義勇兵"
-		f.hp = 3
-		f.max_hp = 3
-		f.passive_desc = "每回合對隨機敵方造成1點傷害"
-		f.can_block = false
-		battle_manager.follower = f
-		phase_label.text = "三顧茅廬: 獲得義勇兵!"
+		# Pick a random non-strategist follower (strategist is shop-only)
+		var types: Array[Follower.FollowerType] = [Follower.FollowerType.VOLUNTEER, Follower.FollowerType.GUARDIAN, Follower.FollowerType.SCOUT, Follower.FollowerType.MEDIC]
+		battle_manager.follower = Follower.create(types[randi() % types.size()])
+		phase_label.text = "三顧茅廬: 獲得%s!" % battle_manager.follower.name_zh
 	print("[Event] 三顧茅廬")
+	map_manager.advance_to_next_node()
 
 
 func _event_empty_city() -> void:
@@ -1083,6 +1204,7 @@ func _event_empty_city() -> void:
 	battle_manager.player_hp = min(battle_manager.player_hp + heal_amount, battle_manager.player_max_hp)
 	phase_label.text = "空城計: 回復 %d 體力!" % heal_amount
 	print("[Event] 空城計: healed %d" % heal_amount)
+	map_manager.advance_to_next_node()
 
 
 func _event_wine_discussion() -> void:
@@ -1095,6 +1217,7 @@ func _event_wine_discussion() -> void:
 		battle_manager.player_max_hp = max(1, battle_manager.player_max_hp - 1)
 		phase_label.text = "煮酒論英雄: 體力上限-1..."
 	print("[Event] 煮酒論英雄: max HP now %d" % battle_manager.player_max_hp)
+	map_manager.advance_to_next_node()
 
 
 func _event_peach_garden_oath() -> void:
@@ -1105,6 +1228,7 @@ func _event_peach_garden_oath() -> void:
 		battle_manager.deck.append(peach)
 	phase_label.text = "桃園結義: 完全回復! +1桃"
 	print("[Event] 桃園結義: full heal")
+	map_manager.advance_to_next_node()
 
 
 func _event_wine_slash() -> void:
@@ -1123,3 +1247,122 @@ func _event_wine_slash() -> void:
 			battle_manager.deck.append(wine)
 		phase_label.text = "溫酒斬華雄: 獲得1張酒"
 	print("[Event] 溫酒斬華雄")
+	map_manager.advance_to_next_node()
+
+
+# -- Interactive event: recruit ally with choice --
+
+var _event_choices_made: int = 0
+
+func _event_recruit_ally() -> void:
+	## 招募義士: Interactive event — choose between 2 follower types.
+	## If player already has a follower, offer gold instead.
+	if battle_manager.follower and battle_manager.follower.is_alive():
+		# Already have a follower — give gold instead
+		map_manager.add_gold(15)
+		phase_label.text = "招募義士: 已有隨從, 獲得15金幣"
+		print("[Event] 招募義士: already have follower, +15 gold")
+		map_manager.advance_to_next_node()
+		return
+
+	# Pick 2 random follower types to offer as choices
+	var all_types: Array[Follower.FollowerType] = [
+		Follower.FollowerType.VOLUNTEER,
+		Follower.FollowerType.GUARDIAN,
+		Follower.FollowerType.SCOUT,
+		Follower.FollowerType.MEDIC,
+	]
+	all_types.shuffle()
+	var choice_a_type: Follower.FollowerType = all_types[0]
+	var choice_b_type: Follower.FollowerType = all_types[1]
+	_event_choices_made = 0
+
+	# Use reward overlay to show event choices
+	reward_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	reward_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	reward_overlay.visible = true
+	reward_title.text = "招募義士 — 選擇一位隨從"
+
+	# Clear container
+	for child in reward_container.get_children():
+		reward_container.remove_child(child)
+		child.queue_free()
+
+	# Create choice panels for each follower type
+	for f_type in [choice_a_type, choice_b_type]:
+		var f := Follower.create(f_type)
+		var panel := Panel.new()
+		panel.custom_minimum_size = Vector2(160, 160)
+		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0.15, 0.2, 0.3, 0.9)
+		style.border_color = Color(0.5, 0.7, 1.0)
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_left = 8
+		style.corner_radius_bottom_right = 8
+		panel.add_theme_stylebox_override("panel", style)
+
+		var fvbox := VBoxContainer.new()
+		fvbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(fvbox)
+
+		var name_lbl := Label.new()
+		name_lbl.text = "🤝 %s" % f.name_zh
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_lbl.add_theme_font_size_override("font_size", 15)
+		fvbox.add_child(name_lbl)
+
+		var hp_lbl := Label.new()
+		hp_lbl.text = "HP: %d  ATK: %d" % [f.max_hp, f.attack_power]
+		hp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hp_lbl.add_theme_font_size_override("font_size", 12)
+		fvbox.add_child(hp_lbl)
+
+		var desc_lbl := Label.new()
+		desc_lbl.text = f.passive_desc
+		desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc_lbl.add_theme_font_size_override("font_size", 11)
+		fvbox.add_child(desc_lbl)
+
+		# Clickable button overlay
+		var btn := Button.new()
+		btn.text = "選擇"
+		btn.flat = false
+		btn.anchors_preset = Control.PRESET_BOTTOM_WIDE
+		btn.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn.pressed.connect(_on_event_ally_chosen.bind(f_type))
+		fvbox.add_child(btn)
+
+		reward_container.add_child(panel)
+
+	# Hide battle UI during event choice
+	$EnemyArea.visible = false
+	end_turn_btn.visible = false
+	skill_btn.visible = false
+
+
+func _on_event_ally_chosen(follower_type: int) -> void:
+	## Player chose a follower from the recruit event.
+	var f := Follower.create(follower_type as Follower.FollowerType)
+	battle_manager.follower = f
+	phase_label.text = "招募義士: 獲得%s!" % f.name_zh
+	print("[Event] 招募義士: recruited %s" % f.name_zh)
+
+	# Hide event overlay
+	reward_overlay.visible = false
+	$EnemyArea.visible = true
+	end_turn_btn.visible = true
+	_refresh_ui()
+
+	# Clear reward container
+	for child in reward_container.get_children():
+		reward_container.remove_child(child)
+		child.queue_free()
+
+	map_manager.advance_to_next_node()

@@ -474,6 +474,10 @@ func start_turn() -> void:
 	if equipment_slots.has("horse_plus"):
 		block += 1
 		print("[+1馬] Gained 1 block from %s (total: %d)" % [equipment_slots["horse_plus"].name_zh, block])
+	# Follower passive: fires at start of each player turn
+	if follower and follower.is_alive():
+		follower.execute_passive(self)
+		print("[Ally] %s used passive" % follower.name_zh)
 	turn_started.emit(turn_number)
 	_advance_phase(Phase.JUDGMENT)
 
@@ -1128,11 +1132,7 @@ func _setup_follower() -> void:
 		# Check starting deck for 招募義勇兵 card
 		for card in hand:
 			if card.id == "recruit_volunteer":
-				follower = Follower.new()
-				follower.hp = 3
-				follower.max_hp = 3
-				follower.name_zh = "義勇兵"
-				follower.passive_desc = "每回合對隨機敵方造成 1 點傷害"
+				follower = Follower.create(Follower.FollowerType.VOLUNTEER)
 				hand.erase(card)
 				discard_pile.append(card)
 				break
